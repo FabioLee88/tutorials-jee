@@ -1,0 +1,94 @@
+DESIGN PATTERNS
+
+- Creational pattern:
+	utile alla creazione di oggetti, incapsulando tutta la logica della creazione
+	spesso inizializza direttamente gli oggetti restituiti
+- Structural pattern:
+	definisce metodologie di composizione della struttura delle classi, ereditarietà e interfacce
+	definice modi per strutturare classi e oggetti in modo da ottenere nuove funzionalità
+- Behavioral pattern:
+	è specifica per la comunicazione tra gli oggetti(definisce il comportamento)
+- J2EE Pattern:
+	identificati dalla Sun Java Center, sono specifici per il presentation tier(livello di presentazione)
+	
+
+CREATIONAL PATTERN
+
+- Factory pattern:
+	Di solito prevede la creazione di una classe "factory" utile 
+	per la creazione degli oggetti (es. <<Shape>>, ClassRectangle, ClassCircle, ClassSquare , ShapeFactory)
+	
+- Abstract Factory Pattern:
+	Concetto più elevato del Factory pattern che è utile alla creazione direttamente delle classi Factory
+
+- Singleton pattern:
+	Creazione di un unico oggetto a partire dalla classe(se nn c'è lo crea se c'è usa quello)
+	
+- Builder Pattern:
+	Costruisce oggetti colplessi partendo da oggetti semplici e procedendo passo dopo passo
+	
+- Prototype pattern:
+	Duplica gli oggetti per migliorare le performance.
+	Utilizzando la clonazione degli oggetti e tenendo i nuovi oggetti in cache
+	evita di effettuare le operazioni di creazione oppure di recupero dal db degli oggetti che 
+	possono essere onerose(+ tempo)
+
+STRUCTURAL PATTERN
+	
+- Adapter Pattern:
+	Si comporta come un ponte fra due interfacce incompatibili. (Adattatore)
+
+- Bridge Pattern:
+	Separare la classe astratta dalla sua implementazione
+
+- filter pattern/criteria pattern:
+	Interfaccia e diversi comportamenti
+
+- Composite pattern:
+	raggruppare oggetti diversi o liste di oggetti in un unico oggetto o in un albero di oggetti
+	
+- decorator pattern:
+	aggiungere funzionalità ad un oggetto senza modificare la struttura dello stesso(Creazione di Wrapper)
+	
+- Facade pattern:
+	aggiunge una interfaccia(classe intermedia/ classe facciata) al sistema per ridurne la complessità, estrapolando tutte le funzionalità utili
+	
+- FlyWeight pattern:
+	utile a ridurre il numero degli oggetti generati dal sistema in modo da migliorare le performance
+	riutilizza gli oggetti gia generati
+	
+- Proxy pattern:
+	creazione di una classe che funge da tramite per le funzionalità di un'altra classe in modo da ottimizzarne le funzionalità salvandosi in memoria le cose gia richieste 
+	in modo da non effettuarne nuovamente la richiesta
+
+BEHAVIORAL PATTERN:
+
+- Chain of responsability pattern:
+		creazione di una catena di oggetti ricevitori per una singola richiesta
+		il modello disaccoppia mittente e ricevitore in base al tipo di richiesta
+		in questo pattern ogni ricevitore contiene il link al ricevitore successivo, se lui stesso non riesce a gestire la richiesta la gira al ricevitore successivo
+		
+- Command pattern:
+	una richiesta viene wrappata in un oggetto "comando" ed inviata ad in oggetto "invoker" che guarda di che tipo è il comando
+	e rigira la richiesta al giusto gestore
+
+- Interpreter pattern:
+	utilizzato per interpretare e validare espressioni (es. SQL)
+	
+- Iterator pattern:
+	Classe Iteratore che si muove sulla lista di elementi senza sapere che tipo di implementazione abbia la lista
+
+- Mediator pattern:
+	riduce la complessita di comunicazione tra oggetti e classi multiple inserendo una classe che ne fa da mediatore
+	
+- memento pattern:
+	utile a ripristinare una precedente versione dello stato di un oggetto
+
+- observer pattern:
+	utilizzato nelle relazioni uno a molti: quando un oggetto viene modificato, la modifica viene notificata a tutti gli altri oggetti
+	
+- state pattern:
+	il comportamento di una classe cambia in base al suo stato
+	
+- Null object pattern:
+	
