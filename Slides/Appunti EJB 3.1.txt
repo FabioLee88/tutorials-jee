@@ -1,0 +1,54 @@
+EJB 3.1
+
+Novità in 3.1:
+- Una view locale semplifivata che provvede all'accesso dei Session Bean senza aver bisogno di una interfaccia locale di business.
+- Packaging e deployment degli EJB direttamente all'interno del .war e non in ejb-jar
+- Un'API incorporata che permette di eseguire gli EJB all'interno di ambienti java Session
+- Un componente Singleton session bean che permette il facile accesso agli stati condivisi come i callbacks di accensione e spegnimento applicazione.
+- Creazione automatica di EJB timers.
+- Calendar basato su Ejb Timer expressions
+- invocazione asincrona di session bean
+- funzionalità generiche aggiuntive
+=> Una sintassi dei nomi JNDI globale e portatile per cercare i componenti EJB
+
+
+Novità in 3.0:
+=> Aggiunta delle Annotazioni
+=> annotazioni per accessi tramite JNDI
+- eliminazione dei requirements du ejb come session bean
+- semplificazioni sulla persistenza
+-......... e altri
+
+
+EJB Roles:
+Esistono sette ruoli distinti per gli EJB:
+- Enterprise Bean Provider:	è il produttore di Enterprise Bean
+- Application Assembler: combina gli enterprise bean(E.B.) in grandi e deployabili application units. Produce uno o più ejb-jar file che contengono gli E.B. + le istruzioni per assemblarli
+- Deployer: prende uno o più ejb-jar file e li deploya in uno specifico ambiente che a sua volta deve essere un EJB server e container. risolve le dipendenze esterne. L'output è un set di enterprise bean configurati per poter essere installati in quello specifico ambiente
+- EJB Server Provider: 
+- Ejb Container Provider:
+- Persistence Provider:
+- System Administrator:
+
+
+Enterprise Bean
+è un'architettura per applicazioni enterprise component-based transaction oriented. Caratteristiche:
+- EB contiene logica di business e opera su dati enterprise
+- le istanze degli EB sono gestite a runtime dal container
+- possono essere customizzatin in base all'ambiente a deploy time
+- diverse informazioni di servizio, come transazioni, sicurezza con le annotazioni oppure su file XML(deployment descriptor)
+- il Client accede agli EB tramite il container
+
+EJB Types:
+- Session Object: 
+	Eseguito per singolo client, può utilizzare transazioni e accedere al database, ha una vita relativamente breve e viene cancellato anche in caso di crash dell'Ejb container
+	Tipi:
+		>Stateful session bean
+		>Stateless session bean
+		>Singleton session bean
+- Message Driven Object:
+	Eseguito su rischiesta di un singolo messaggio di un client, è invocato in maniera ascincrona, può usare le transazioni e aggiornare dati in DB, ha vita relativamente breve, è stateless. cancellato se avviene crash del container
+- Entity Object: 
+	è parte del modello di dominio, è una view di un dato del database. Può avere una vita lunga(in db), sopravvive al crash del container
+	
+/*-/*-/*-/-*/- PAGINA 41 - 44

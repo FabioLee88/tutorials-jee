@@ -91,4 +91,56 @@ BEHAVIORAL PATTERN:
 	il comportamento di una classe cambia in base al suo stato
 	
 - Null object pattern:
+	viene creato un oggetto che rappresenta il valore null, utilizzato anche come valore di default
+
+- Strategy pattern:
+	consente la modifica del comportamento di una classe o di un algorimo a runtime
+	vengono definite le classi comportamento e in base allo stato del sistema vengono passate ad una classe contesto che le esegue 
+
+- Template pattern:
+	in questo pattern una classe astratta definisce dei metodi astratti privati e dei metodi final pubblici che richiamano gli astratti, le sue sotto classi personalizzeranno il comportamento dei metodi astratti pur lasciando invariato il comportamento della classe verso l'esterno(public final)
 	
+- Visitor pattern:
+	comporta la creazione di una classe Visitatore che in base all'elemento visitato modifica l'algoritmo di esecuzione
+	
+- MVC Pattern:
+	Model View Controller Pattern
+
+J2EE PATTERN:	
+	
+- Business Delegate Pattern:
+	Utilizzato per disaccoppiare il livello di presentazione da quello di business.
+	è essenzialmente usato per ridurre le lookup remote e ridurre le comunicazioni con il livello di business dal livello di presentazione.
+	Entità: Client, Business Delegate, LookUp Service, Business Service
+	
+- Composite Entity Pattern:
+	utilizzato nei meccanismi di persistenza degli EJB.
+	Un'entità composta è un EJB entity bean che rappresenta un grafo di oggetti.
+	Quando questa entità composta viene aggiornata , tutti gli oggetti interni vengono aggiornati automaticamente e gestiti dall'EJB entity bean.
+	Entità interessate: Composite Entity, Coarse-Grained Object
+
+- Data Access Object Pattern(DAO):
+	usato per separare le api di accesso ai dati di basso livello oppure le operazioni da alti livelli di business service.
+	Entità: Data Access Object Interface, Data Access Object Concrete class, Model Object or Value Object
+	
+- Front Controller Pattern:
+	è usato per centralizzare il meccanismo di gestione delle rischieste, cosi da sottoporre tutte le richieste ad un handler unico
+	questo handler potrà effettuare l'autenticazione/autorizzazione/logging e tracking delle request 
+	e successivamente passare le request all'handler corrispettivo
+	Entity: Front Controller, Dispatcher, View
+	
+- Intercepting Filter Pattern:
+	utilizzato quando si vuole qualcosa prima o dopo aver intercettato una request o inviato una response
+	Vengono applicati dei Filtri allre richieste che prima di leggere la richiesta possono eseguire l'autenticazione, l'autorizzazione, logging e tracking e successivamente passare la richiesta all'handler.
+	Entità: Filter, FilterChain, Target, FilterManager, Clients
+	
+- Service Locator Pattern:
+	è usato per individuare i servizi utilizzando JNDI.
+	consideraando il costo elevato di individuazione di JNDI, il pattern utilizza tecniche di caching.
+	Il service Locator utilizza JNDI per individuare il servizio, per tutti i prossimi lookuo del medesimo servizio, esso è gia in cache e quindi aumenta le prestazioni.
+	Entities: Service, Context/Initial Context, Service Locator, cache, Client
+	
+- Transfer Object Pattern:
+	Utilizzato quando si vuole passare in un colpo solo dati degli attributi multipli dal client al server.
+	Oggetto POJO con getter e setter che può essere serializzato per il trasferimento in rete che contiene tutti gli attributi da inviare(Classe contenitore serializzabile).
+	Entities: Business Object, Transfer Object, Client.
