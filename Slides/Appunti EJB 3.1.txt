@@ -51,4 +51,238 @@ EJB Types:
 - Entity Object: 
 	è parte del modello di dominio, è una view di un dato del database. Può avere una vita lunga(in db), sopravvive al crash del container
 	
-/*-/*-/*-/-*/- PAGINA 41 - 44
+
+CLIENT VIEW OF A SESSION BEAN
+Per i client i session bean sono classi di business non condivise con altri client che girano sul server. Per accedere ai session object si utilizza una session bean client view.
+Solo un singleton session bean o un statless session bean può diventare un web service client.
+Un client può invocare in session bean in maniera sincorna o asincrona(che ritornerà un Future<V>)
+I session bean vivono in un container che provvede a gestire la sicurezza, concorrenzam transizioni e altro in maniera trasparente al client.
+Ogni session bean di solito non sopravvive al crash del sistema.
+Possono essere installati più session bean in un container, il container permette ai client dei session bean dei client view locali o remote  per ottenere le interfacce di business, oppure le interfacce degli enterprise bean installati attraverso CDI tramite JNDI.
+
+
+LOCAL, REMOTE, AND WEB SERVICE CLIENT VIEW
+- Remote:
+	Si accede tramite delle remote business interface
+	passaggio di istanze per valore
+	location indipendence e flessibilità in merito alla distribuzione dei componenti negli ambienti
+	le chiamate remote sono potenzialmente costose poichè passano i valori (latenza rete, carico di dati,...)
+	gli oggetti passati devono essere serializzabili
+	possibili errori di comunicazione(Remote Exception)
+	
+- Local:
+	Local business interface oppure no-interface local java object
+	passaggio di valori per riferimento
+	richiede la collocazione di local client view
+	l'enterprise bean e il client devono essere collocati nello stesso ambiente
+	
+Si implementano entrambe le solizioni cosi che il Bean Provider al momento del develop dell'enterprise bean scelga quale usare.
+
+- Web Service Client:
+	possono essere implementati da stateless session bean e da Singleton session bean
+	Un web service client può accedere al session bean tramite una web services client view descritta tramite WSDL( scritto in XML descrive il web service come un insieme di operazioni)
+	Gli XML vengono trasferito con protocollo SOAP su HTTP e HTTPS
+	
+
+EJB Container
+E' responsabile del marking delle business interface e home interface utili al deploy degli enterprise bean tramite dependency injection e lookup in the JNDI namespace
+	
+
+CLIENT VIEW OF SESSION BEAN WRITTEN TO THE EJB 3.X SEMPLIFIED API
+I client locali o remoti EJB 3.X di un session bean scritto con le api ejb 3.x accedono ai session bean tramite le loro business interface.(normali interfacce, locale e remota)
+Un client locale potrebbe anche accedere ai metodi pubblici del session bean senza utilizzare l'interfaccia.
+
+COME OTTENERE UNA INTERFACCIA DI UN SESSION BEAN
+Tramite Dependency Injection o Lookup nel namespace di JNDI.
+
+Es. Recupero dell'interfaccia Cart per il session bean CartBean 
+- tramite CDI:
+	@EJB Cart cart;
+- tramite Lookup JNDI:
+	@Resource SessionContext ctx;
+	...
+	Cart cart = (Cart)ctx.lookup("cart");
+In entrambi i casi la stessa sintassi si usa per le interfacce locali o remote.
+
+
+COME OTTENERE UNA REFERENZA AD UNA VIEW SENZA INTERFACCIA
+Avviene tramite CDI o Lookup JNDI
+Es. Recupero del session bean CartBean 
+- tramite CDI:
+	@EJB CartBean cart;
+- tramite Lookup JNDI:
+	@Resource SessionContext ctx;
+	...
+	CartBean cart = (CartBean)ctx.lookup("cart");
+
+	
+INTERFACCIA DI BUSINESS DEI SESSION BEAN
+Di solito viene restitutita da metodi di una business interface e in caso di local può essere restituita anche da metodi pubblici del sessio bean
+Nel caso di interfacce di business di stateful session bean, di solito si trovano metodi per inizializzare lo stato della sessione dell'oggetto e un metodo per indicare che il clien ha finito di utilizzare il session bean e che quindi può essere rimosso.
+
+
+VIEW SENZA INTERFACCIA DEI SESSION BEAN
+Implementato direttamente dal EJB Container e inviata ai client che richiedono una istanza dell SessionBean
+
+
+CICLO DI VITA DEI CLIENT VIEW DEI SESSION BEAN
+per gli stateful sessione bean i clien potrebbero chiamare il metodo Remove() ma per gli singleton session bean il ciclo di vitaè gestito dal container.
+
+
+IDENTITA' DEI SESSION OBJECT
+Ogni volta che si fa @EJB di un statefull session bean si crea una nuova istanza, se lo si fa su uno stateless o su un singleton il container restituirà sempre la solita istanza
+
+
+INVOCAZIONI ASINCRONE
+Di default le invocazioni dei session bean tramnite interfacce remote, locali o no interface sono sincrone.
+Se viene fatta la chiamata asincrona il container restituisce il Future<V> e continua l'esecuzione se non ci sono state eccezioni.
+V rappresenta il l'oggetto di risposta, Future.cancel, Future.get...
+Es.
+@Asyncronous
+public Future<Integer> performCalculation(...){
+	// ... do calculation
+	Integer Result = ...;
+	return new AsyncResult<Integer>(result);
+}
+Es.2
+
+public interface Calculator {
+@Asynchronous
+	public Future<Integer> performCalculation(int a, int b);
+}
+
+@Stateless
+@Local(Calculator.class)
+public class CalculatorBean {
+	public Integer performCalculation(int a, int b) {
+		// ... do calculation
+		Integer result = ...;
+		return result;
+	}
+}
+
+LE VIEW DEI CLIENT PER I WEB SERVICE DI UN SESSION BEAN
+Per i client sono trasparenti le implementazioni poichè usano i ws endopint per comunicare:
+- JAX-WS: 
+	il client ottiene una referenza all'istanza del service tramite CDI o JNDI.
+	l'istanza del service è usata per otterne un oggetto porta per il web service endpoint
+	Es. 
+		@WebServiceRef
+		public StockQuoteService stockQuoteService;
+		...
+		StockQuoteProvider sqp = stockQuoteService.getStockQuoteProviderPort(),
+		float quotePrice = sqp.getLastTradePrice("ACME");
+		...
+		
+- JAX-RPC:
+	ottiene all'oggeto service tramite CDI o JNDI
+	l'interfaccia del service viene usata per otterne uno stub o un proxy che implementano l'interfaccia di endpoint del web service del session bean
+	ES.
+		Context ctx = new InitialContext();
+		StockQuoteService sqs = (StockQuoteService) ctx.lookup("java:comp/env/service/StockQuoteService");
+		StockQuoteProvider sqp = sqs.getStockProviderPort();
+		float quotePrice = sqp.getLastTradePrice("ACME");
+		...
+
+INTERCEPTOR DEI SESSION BEAN:
+- PostContruct
+- PreDestroy
+- PostActivate
+- PrePassivate
+
+
+SINTASSI JNDI
+java:global[/<app-name>]/<module-name>/<bean-name>[!<fully-qualified-interface-name>]
+java:app[/<app-name>]/<module-name>/<bean-name>[!<fully-qualified-interface-name>]
+java:module[/<app-name>]/<module-name>/<bean-name>[!<fully-qualified-interface-name>]
+
+
+BEAN PROVIDER
+Responsabilità:
+- Session bean class
+- Session bean business interface
+- Session bean remote interface
+- Session bean local interface
+- Session bean web service endopoint interface
+- Interceptor classes
+
+
+SESSION BEAN CLASS
+Requisiti:
+- la classe deve essere pubblica, non final e non abstract. deve essere una Top level class
+- deve avere costruttore public senza parametri
+- la classe non deve definire un metodo finalize()
+- la classe deve implementare l'interfaccia di business
+- la classe deve implementare metodi di business
+opzionalmente:
+- la classe deve implementare, direttamente o indirettamente l'interfaccia SessionBean
+- se la classe è uno stateful sesison bean può  implementare l'interfaccia SessionSyncronization o usare una annotazione apposita
+- può implementare un web service endpoint session bean o interfaccia componente
+- se la classe è un session bean stateless, può implementare una interfaccia TimedObject 
+- la classe può implementare il metodo ejbCreate()
+
+Un session bean può avere una superclasse a patto che sia anch'essa una session bean
+
+
+SESSION SYNCHRONIZATION METHODS
+la classe bean (o superclasse) di uno stateful session bean può usare uno o più annotazioni di sincronizzazione di sessione: @AfterBegin, @BeforeCompletation e @AfterCompletation.
+é possibile utilizzare le precedenti annotazioni solo su un metodo per classe
+i metodi che le uti8lizzano devono:
+- non essere final o static
+- il return deve essere void
+- @AfterBegin e @BeforeCompletation non possono accettare argomenti
+- @AfterCompletation accetta solo un argomento boolean
+
+
+eJbCreate<METHOD> Methods
+...
+
+BUSINESS METHODS
+- non possono avere il nome che inizia con ejb
+- devono essere public
+- non possono essere final o static
+
+SESSION BEAN BUSINESS INTERFACE
+@Local e @Remote
+
+
+RESPONSABILITA' DEL CONTAINER PROVIDER
+///*/*/*/*/*/ pag 128
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
