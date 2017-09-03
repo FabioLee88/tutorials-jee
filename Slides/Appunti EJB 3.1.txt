@@ -197,6 +197,18 @@ java:app[/<app-name>]/<module-name>/<bean-name>[!<fully-qualified-interface-name
 java:module[/<app-name>]/<module-name>/<bean-name>[!<fully-qualified-interface-name>]
 
 
+THE RESPONSABILITIES OF CONTAINER PROVIDER
+E' responsabile al recupero degli strumenti per il deploy e della gestione dei session bean a runtime.
+Gli strumenti per il deploy tramite il container sono responsabili della creazione di tutte le istanze delle classi addizionali ai session bean.
+Lo strumento ottiene le informazioni necessarie per ricercare le classi tramite l'ispezione delle classi restituite dal bean provider e esaminando i session bean deplyoment descriptor.
+I deployment tool devono generare le seguenti classi:
+- classi che implementatno business interface
+- classi che implementatno business no-interface
+- ...
+
+/*/*/*/*/*   PAg 133
+
+
 BEAN PROVIDER
 Responsabilità:
 - Session bean class
