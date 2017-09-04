@@ -197,18 +197,6 @@ java:app[/<app-name>]/<module-name>/<bean-name>[!<fully-qualified-interface-name
 java:module[/<app-name>]/<module-name>/<bean-name>[!<fully-qualified-interface-name>]
 
 
-THE RESPONSABILITIES OF CONTAINER PROVIDER
-E' responsabile al recupero degli strumenti per il deploy e della gestione dei session bean a runtime.
-Gli strumenti per il deploy tramite il container sono responsabili della creazione di tutte le istanze delle classi addizionali ai session bean.
-Lo strumento ottiene le informazioni necessarie per ricercare le classi tramite l'ispezione delle classi restituite dal bean provider e esaminando i session bean deplyoment descriptor.
-I deployment tool devono generare le seguenti classi:
-- classi che implementatno business interface
-- classi che implementatno business no-interface
-- ...
-
-/*/*/*/*/*   PAg 133
-
-
 BEAN PROVIDER
 Responsabilità:
 - Session bean class
@@ -258,9 +246,20 @@ SESSION BEAN BUSINESS INTERFACE
 @Local e @Remote
 
 
-RESPONSABILITA' DEL CONTAINER PROVIDER
-///*/*/*/*/*/ pag 128
+LA RESPONSABILITA' DEL CONTAINER PROVIDER
+E' responsabile al recupero degli strumenti per il deploy e della gestione dei session bean a runtime.
+Gli strumenti per il deploy tramite il container sono responsabili della creazione di tutte le istanze delle classi addizionali ai session bean.
+Lo strumento ottiene le informazioni necessarie per ricercare le classi tramite l'ispezione delle classi restituite dal bean provider e esaminando i session bean deplyoment descriptor.
+I deployment tool devono generare le seguenti classi:
+- classi che implementatno business interface
+- classi che implementatno business no-interface
+- ...
 
+MESSAGE DRIVEN BEAN COMPONENT CONTRACT
+E' un consumatore di messaggi asincroni.
+Ogni message driven bean viene definito per un singolo tipo di messaggio in accordo con l'interfaccia di message listener utilizzata.
+Un client utilizza questo bean inviando dei messaggi a dei destinatari
+L'istanza del message driven bean è gestita interamente dal container, viene creata solo quando ci sono dei messaggi che deve gestire.
 
 
 

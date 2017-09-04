@@ -1,0 +1,83 @@
+MANNING 2007 - EJB IN ACTION
+
+Capitolo 1
+Tre tipi di EJB COmponents: session bean, message driven bean, entities. I primi 2 per la logica di business e il terzo per la persistenza.
+Il framework EJB contiene una serie di servizi gia implementati che permettono allo sviluppatore di conentrarsi sullo sviluppo della logica di business.
+Questi servixi sono avviabili sugli EJB COmponent quando loro sono deployati nel lodo EJB container.
+Grazie a Java 5 dove è possibile utilizzare le annotazioni e la dependency injection il container può offirre questi servizi:
+- transazioni
+- sicurezza
+- persistenza
+- remotezza
+- interceptors
+- timers
+- state management
+- messaggistica
+
+Tramite le annotazioni(metadata) lo sviluppatore dice cosa deve essere fatto e il sistemma aggiunge il codice per farlo.
+Una annotazione trasforma un semplice POJO in un EJB.
+
+Siccome i programmi hanno più o meno tutti la stessa logica cioè restituire ed elaborare dati salvati ci si affida a dei pattern utilizzando una architettura a livelli.
+Ogni livello fornisce informazioni al livello sottostante.
+EJB permette di cotruire applicazioni utilizzando 2 diverse architetture a livelli:
+- TRADITIONAL FOUR TIER LAYERED ARCHITECTURE
+	a) presentation layer(GUI) per l'imput dell'utente
+	b) business logic layer è il cuore dell'applicazione e contiene workflow e processi logici
+	c) persistence layer è una astrazione di alto livello Object Oriented del dabase layer
+	d) database layer consiste nel database relazionale(RDBMS) come Oracle, DB2, Sql Server...
+- DOMAIN DRIVEN DESIGN(DDD)
+	Concentrarsi sul dominio e rendere gli oggetti entity capaci di avere comportamenti e di impiegare le caratteristiche dell'OO come l'ereditarietà e il poliformismo.
+
+EJB Component è definito 'bean'
+Il persistence provider agisce, come il container per i session e message driven bean, ma per le entity.
+Il persistence provider è inserito all'interno del container e si astrae dietro le Java Persistence API (JPA)(FIGURA PAG 16)
+
+
+SESSION BEAN
+Viene invocvato da un client per l'esecuzione di specifiche operazioni di business.
+Il nome session implica che un'istanza del bean è avviabile per la durata di una unità di lavoro e non sopravvive e crash o spegnimento del server.
+Due tipi:
+- Stateful:
+	salva automaticamente lo stato del bean tra le invocazioni dello stesso client(Es. il carrello di Amazon)
+- Stateless:
+	Non mantiene nessuno stato tra una invocazione e l'altra dal aprte di un client(Es. carica carta di credito o controllo storico carta=
+
+Un session bean può essere incovato Localmente o remotamente tramite Java RMI.
+Uno stateless session bean può essere esposto come WEB SERVICE
+
+
+MESSAGE-DRIVEN BEAN
+Processa la logica di business.
+I clients non invocano il MDB direttamente, ma il MDB viene triggerato dai messaggi inviati al server, che ha abilitato la messaggistica asincrona tra i componenti del sistema.
+
+
+ENTITIES AND JPA
+La persistenza è l'abilità di avere i dati contenuti in oggetti java automaticamente salvati su database relazionali(ORM - object relational mapping/ Es. Hibernate)
+In EJB 3 la persistenza è gestita dalle JPA che a sua volta è semplificata tramite gli ORM.
+I JPA definiscono uno standard per:
+- creazione di mertadata per la configurazione ORM per mappare le entities alle tabelle relazionali
+- l'entity manager api - un api standard per eseguire operazioni di persistenza CRUD sulle entity(create, read, update and delete)/
+- il Java Persistence Query Language(JPQL), per cercare e trovare dati applicativi stored(salvati sul db)
+
+Si possono aggiungere diversi prodotti ORM sulle JPA come Jboss Hibernate, Oracle TopLink o BEA Kodo utilizzandoli come persistence provider della propria applicazione.
+
+ENTITIES
+Sono la rappresentazione OO delle entità presenti sul database e includono capacita ri relazione, ereditarietà e plomorfismo
+Contengono metadata per mappare i campi del database con i campi dell'oggetto
+
+ENTITY MANAGER
+L'interfaccia JPA EntityManager gestisce le entities in termini di provvedere fisicamente ai servizi di persistenza.
+Esso conosce come salvare i dati delle entity nel database, upload e delete e select.
+JPA ha la capacità di gestire il cliclo di vita, le perdormance, il caching e il transaction management.
+
+JPQL
+specifica SQL-LIKE linguaggio delle query
+
+1.3 Pag 19
+FIGURA 1.7 Raggruppamento Java EE Container[ web Container, Ejb contaienr, persistence provider]
+
+Glassfish, Jboss hanno JavaEEContainer
+Tomcat ha solo {web contaqiner e persistence provider(hibernate)}
+
+pag 21
+
