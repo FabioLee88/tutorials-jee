@@ -79,5 +79,106 @@ FIGURA 1.7 Raggruppamento Java EE Container[ web Container, Ejb contaienr, persi
 Glassfish, Jboss hanno JavaEEContainer
 Tomcat ha solo {web contaqiner e persistence provider(hibernate)}
 
-pag 21
+
+SERVIZI GESTITI DALL'EJB CONTAINER E DAL PERSISTENCE PROVIDER
+(- Service, = Applies To, >Means)
+
+- Integration
+= Session bean and MDBs
+> aiuta ad incollare insieme i componenti tramite semplici configurazioni invece di codice.
+	Utili sono la dependency injection DI e le lookup
+
+- Pooling
+= Stateless session beans, MDBs
+> per ogni EJB component l'EJB platform crea un pool di istanze dei suddetti componenti che vengono condivisi tra i clients.
+	Quando un client smette di usare una di queste istanze, ques'tultima torna nel pool per essere riutilizzata
+
+- Thread-safety
+= Session Beans e MDBs
+> Ejb rende tutti i componenti thread safe e performanti in modo invisibile. 
+	In questo modo lo sviluppatore può scrivere componenti server come una applicazione single-thread desktop senza preoccuparsi di questa complessità.
+	
+- State Management
+= Stateful session beans
+> Il container gestisce in maniera trasparente lo stato delle singole istanze di queste componenti
+
+- Messaging
+= MDBs
+> permette di scrivere messaggi senza avere idea della logica di comunicazione di tali messaggi.
+
+- Transactions
+= Session Beans and MDB
+> Configurabile tramite configurazione, no codice. Si può definire un metodo transazionale, se finisce correttamente committa altrimenti fa rollback.
+
+- Security
+= Session Beans
+> Ejb supporta l'integrazione con le API di Java Authentication and Authorization Service (JAAS). Configurazione no codice.
+
+- Interceprots
+= Session beans e MDBs
+> permette di separare il logging, l'auditing in maniera configurabile.
+
+- Remote access
+= Session beans
+> è possibile rendere remoti i componenti senza scrivere codice aggiuntivo ma come se fosse codice locale tramite DI
+
+- Web service
+= Stateless session bean
+> Ejb 3 può girare di componenti di business in dei web services in maniera trasparente e con piccole modifiche al codice
+
+- persistence
+= entities
+> é il punto di maggior successo di EJB 3, fornisce servizi basati su standard ed è conigurabile al 100 %
+
+- caching and performance
+= entities
+> JPA fornisce in maniera trasparente un numero di servizi orinentati al caching dei dati, all'ottimizzazione delle performance e dell'applicazione.
+
+DTO: Data transfer Object creati per la comunicazione dei session ben con il livello di prsentazione poichè non si deve collegare un oggetto entity ad una interfaccia poichè riverserebbe direttamente le modifiche sul db.
+
+Possono essere utilizzate le annotazioni oppure i deployment descriptor.
+Di solito si utilizzano entrambi ma i deployment per specificare la configurazione di un ambiente in particolare e le annotazioni per tutto il resto.
+Le annorazioni sono in javax.annotation.*; specificate da Java 5.
+
+/*/*/*/*/ Pag 54
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
