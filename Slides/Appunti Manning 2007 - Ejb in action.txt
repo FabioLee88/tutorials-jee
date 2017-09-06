@@ -1,6 +1,6 @@
 MANNING 2007 - EJB IN ACTION
 
-Capitolo 1
+---------------- CAPITOLO 1 ----------------
 Tre tipi di EJB COmponents: session bean, message driven bean, entities. I primi 2 per la logica di business e il terzo per la persistenza.
 Il framework EJB contiene una serie di servizi gia implementati che permettono allo sviluppatore di conentrarsi sullo sviluppo della logica di business.
 Questi servixi sono avviabili sugli EJB COmponent quando loro sono deployati nel lodo EJB container.
@@ -69,7 +69,7 @@ ENTITY MANAGER
 L'interfaccia JPA EntityManager gestisce le entities in termini di provvedere fisicamente ai servizi di persistenza.
 Esso conosce come salvare i dati delle entity nel database, upload e delete e select.
 JPA ha la capacità di gestire il cliclo di vita, le perdormance, il caching e il transaction management.
-
+	
 JPQL
 specifica SQL-LIKE linguaggio delle query
 
@@ -136,27 +136,127 @@ SERVIZI GESTITI DALL'EJB CONTAINER E DAL PERSISTENCE PROVIDER
 
 DTO: Data transfer Object creati per la comunicazione dei session ben con il livello di prsentazione poichè non si deve collegare un oggetto entity ad una interfaccia poichè riverserebbe direttamente le modifiche sul db.
 
+
+---------------- CAPITOLO 2 ----------------
 Possono essere utilizzate le annotazioni oppure i deployment descriptor.
 Di solito si utilizzano entrambi ma i deployment per specificare la configurazione di un ambiente in particolare e le annotazioni per tutto il resto.
 Le annorazioni sono in javax.annotation.*; specificate da Java 5.
 
-/*/*/*/*/ Pag 54
+Application Client Container(ACC)
+è un mini Java EE container che può essere lanciato da linea di comando.
+Si può pensare ad una JVM con qualcosa di Java EE iniettato.
+Riconosce molte annotazioni come @EJB utile ad iniettare delle classi presenti sul server e quindi remote tramite la DI.
+la comunicazione avviene tramite RMI e il container provvede all'autenticazione, autorizzazione, ecc.
+Tecnologia utile per i test di unità(JUnit)
+Ogni classe con un main gira all'interno dell'ACC in un application client inpacchettato in un file JAR che deve contenere la MainClass anche nel manifest.
+Opzionalmente il JAR deve contenere un deployment descriptor(application-client.xml) e jndi.properties che contiene le configurazione dell'ambiene a cui connettersi per un Ejb container remoto.
+Esempio di lancio su Glassfish : appclient -client chapter2-client.jar
+
+MESSAGE DRIVEN BEAN(MDB)
+@MessageDriven annotazione da mettere sulla classe MDB che contiene la sua configurazione:
+	activationConfig: parametro configurazione che contiene le @ActivationConfigProperty
+	@ActivationConfigProperty: annotazione che contiene propertyName e properyValue che sono i nome e il path della queue di messaggi salvata
+Ogni classe MDB deve estendere la classe MessageListener per poter gestire i messaggi con il metodo onMessage()
+
+Es. intestazione MDB:
+	@MessageDriven(activationConfig = {
+			@ActivationConfigProperty(propertyName = "destination", propertyValue = "jms/OrderBillingQueue"), //Coda personalizzata
+			@ActivationConfigProperty(propertyName = "destinationType", propertyValue = "javax.jms.Queue") }) //Tipo di coda default
+	public class OrderBillingMDB implements MessageListener {
+		void onMessage()...
+		...
+	}
+
+Un bean che chiama un MDB deve definire un connection Factory e una coda a cui agganciarsi:
+Es. Oggetti per accesso al MDB
+	@Resource(name = "jms/QueueConnectionFactory", mappedName = "ConnectionFactory")
+	private QueueConnectionFactory connectionFactory;
+
+	@Resource(name = "jms/OrderBillingQueue", mappedName = "jms/OrderBillingQueue")
+	private Queue billingQueue;
+
+Es. Modalità accesso MDBs
+	Connection connection = connectionFactory.createConnection();
+	Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+	MessageProducer producer = session.createProducer(billingQueue);
+	ObjectMessage message = session.createObjectMessage();
+	message.setObject(....es. new Object());
+	producer.send(message);
+	producer.close();
+	session.close();
+	connection.close();
+
+PERSISTENZA:
+Es. istanziazione di un Entity Manager
+	@PersistenceContext(unitName = "actionBazaar") //Inietta l'istanza dell'EntityManager
+	private EntityManager em;
+Es. Crud di un oggetto @Entity
+		em.persist(<Object @Entity>);// inserisce l'id nell'oggetto
+		em.update(<Object @Entity>);
+		em.delete(<Object @Entity>);
+Es. generazione di una classe entity
+	@Entity //Trasformazione de POJO in entity
+	@Table(name="BIDS") //Riferimento alla tabella
+	public class Bid implements Serializable { //La classe deve essere serializzabile
+		private Long bidID;
+		private Long itemID;
+		private Long bidderID;
+		private Double bidAmount;
+		private Date bidDate;
+		
+		@Id //Costante che definisce l'id della tabella, la chiave primaria
+		@GeneratedValue(strategy=GenerationType.AUTO) //tipo di generazione dell'id, qusta modalità indica che ad ogni salvataggio di una nuova istanza la chiave viene generata automaticamente
+		@Column(name="BID_ID") //colonna di riferimento
+		public Long getBidID() {
+			return bidID;
+		}
+		public void setBidID(Long bidID) {
+			this.bidID = bidID;
+		}
+		
+		@Column(name="ITEM_ID") //Colonna di riferimento
+		public Long getItemID() {
+			return itemID;
+		}
+		public void setItemID(Long itemID) {
+			this.itemID = itemID;
+		}
+		....
+	}
 
 
+---------------- CAPITOLO 3 ----------------
+Un session bean deve:
+- avere almento un business interface(@Local o @Remote)
+- essere una classe concreta(no abstract method) e non classe final poichè il container deve porterla manipolare
+- costruttore senza argomenti(utile al container poichè il client non istanzia direttamente la classe ma usa DI)
+- può essere una sotto classe di un altro session bean(? od i una clase POJO)
+- i metodi non devono iniziare con 'ejb' poichè interferiscono con il funzionamento dell'infrastruttura
+- non si possono definire metodi final o static
+- sia gli argomenti che i valori di ritorno devono implementare l'interfaccia Serializable
 
+Sui session bean si possono applicare le annotazioni come interceptor @PostCreate, @PreDestroy, @PostActivate, e @PrePassivate(disattivazione temporanea di un bean non utilizzato, solo per gli stateful session bean)
 
+@Stateless(name='') // attributo utilizzato per mappare il bean nel JNDI, se omesso viene inserito il nome della classe
 
+Un session bean può essere invocato in tre modi: localmente nella JVM (@Local), in maniera remota attraverso RMI(@Remote) e in maniera remota come web service(@WebService).
 
+E' possibile inserire tutte e tre le interfacce per un session bean senza scriverle direttamente uytilizzando il seguente codice:
+Es.:
+	@Remote(ExampleInterface.class)
+	@Stateless
+	public class ExampleBean{
+	...
+	}
+	
+Negli stateful session bean tutte le vatiabili per soddisfare i requisiti della passivizzazione dell'entity devono essere serializzabili
+Al contrario degli stateless non possono essere istanziati e messi in un pool a priori
+Esiste l'anotazione @Remove per rimuovere tutti gli oggetti istanziatiche altrimenti rimarrebbero in memoria.
+La passivasione salva il bean sul disco e non in memoria, dopo un certo periodo di inutilizzo lo rimuove del tutto.
 
+Continua da pagina 107
 
-
-
-
-
-
-
-
-
+ 
 
 
 
