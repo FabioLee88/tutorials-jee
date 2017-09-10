@@ -161,10 +161,13 @@ Ogni classe MDB deve estendere la classe MessageListener per poter gestire i mes
 Es. intestazione MDB:
 	@MessageDriven(activationConfig = {
 			@ActivationConfigProperty(propertyName = "destination", propertyValue = "jms/OrderBillingQueue"), //Coda personalizzata
-			@ActivationConfigProperty(propertyName = "destinationType", propertyValue = "javax.jms.Queue") }) //Tipo di coda default
+			@ActivationConfigProperty(propertyName = "destinationType", propertyValue = "javax.jms.Queue") }) //Tipo di coda default, può essere anche Topic
 	public class OrderBillingMDB implements MessageListener {
-		void onMessage()...
-		...
+		void onMessage(Message message){
+			ObjectMessage objectMessage = (ObjectMessage) message;
+			ExampleObject e = (ExampleObject) objectMessage
+			...
+		}
 	}
 
 Un bean che chiama un MDB deve definire un connection Factory e una coda a cui agganciarsi:
@@ -254,31 +257,200 @@ Al contrario degli stateless non possono essere istanziati e messi in un pool a 
 Esiste l'anotazione @Remove per rimuovere tutti gli oggetti istanziatiche altrimenti rimarrebbero in memoria.
 La passivasione salva il bean sul disco e non in memoria, dopo un certo periodo di inutilizzo lo rimuove del tutto.
 
-Continua da pagina 107
+I stateful session bean possono creare criticità nel sistema, come spreco di memoria a causa di oggetti non eliminati e quindi un calo delle prestazioni.
+Alternative ai stateful session bean(di difficile manutenzione i primi 2):
+- stateless bean + persistence: per ogni richiesta i dati vengono salvati direttamente sul db.
+- aggiungere meccanismi lato client che mantengano lo stato
+-* mantenere la sessione in un web container nel caso di una web application. Sebbene l'http è un protocollo stateless le Java servlet Api permettono di mantenere lo stato tramite l'HttpSession.
 
+Best Practice
+- scegliere bene se usare stateful o oggetti httpsession e solo se neccessario
+- usare interfacce remote solo se necessario
+- non iniettare stateful session bean in stateless session bean o in servlet
+- separare i concetti incrociati come logging e auditing utilizzando gli interceptor
+- scegliere gli oggetti più piccoli o primitivi da salvare come variabili dei stateful
+- non dimenticare di creare @Remove per gli stateful
+- gestire la passivazione e la configurazione dei timeout
+
+
+---------------- CAPITOLO 4 ----------------
+Una classe MDB deve:
+- implementare direttamente o indirettamente(lookup o Di) l'interfaccia messageListener
+- deve esdsere una classe concreta e non final o abstract
+- non può essere sottoclasse di un altro MDB
+- deve essere public
+- deve avere un costruttore senza argomenti(se nn c'è viene creato automaticamente)
+- esiste il preDestroy
+
+Message selector: utile a filtrare i messaggi, sono criteri applicati all'header o alle proprietà del messaggio.
+Es. Creazione del consumer
+	MessageConsumer consumer = session.createCostumer(destination, "Fragile IS TRUE");
+Es2. Definizione del MDB 
+	@ActivationConfigProperty(
+		propertyName="messageSelector",
+		propertyValue="Fragile IS TRUE")
+
+L'MDB crea un pool di istanze che al momento debito ne tira fuori una per gestire un messaggio e poi appena finito la riporta nel pool.ù
+
+Un MDB può mandare a sua volta messaggi tramite Di in un altra MDB utilizzata ad esempio per tracciare gli errori.
+L'apertura e la chiusura della connesione con la coda può essere gestita anche da interceptor @postConstruct e @PreDestroy come per le connesioni al DB.
+
+---------------- CAPITOLO 5 ----------------
+Per ogni istanza di un bean, il container in automatico genera un procy chiamato EJB Object. Esso ha accesso a tutte le funzionalità del container(jndi, registry, security,...).
+Tramite gli EJB si può accedere al EJBContext come il SessionContext e il MessageDrivenContext utilizzando l'annotazione @Resource, il context è utile per avere informazioni a runtime e servizi
+@Resource di solito è usato quando deve essere esplicitato il nome(JDBC, Context, MDB...)
+(differenze di utilizzo di @resource sul metodo, variabile o classe)
+Tramite @Resource è possibile dare dei parametri a seconda della configurazione dell'ambiente
+Es. 
+	@Resource(name="valueExample")
+	private boolena valueExample
+Es.
+	<env-entry>
+		<env-entry-name>censorship</env-entry-name>
+		<env-entry-type>java.lang.Boolean</env-entry-type>
+		<env-entry-value>true</env-entry-value>
+	</env-entry>
+
+Tramite lookup a differenza della DI è che lke dipendenze vengono specificate programatticamente e che quindi il carico di lavoro
+per importare le classi utili avviene a deployment time e non a runtime come per la DI
+
+AOP: Aspect Oriented Programming
+Interceptor: 
+- default interceptor: definito per tutte le classi presenti nel modulo EJB
+- class interceptor 
+- method interceptor.
+Se sono definiti più di un su un unica classe vengono chaiamati nell'ordine elencato precedentemente.
+@AroundInvoke: per definire un metodo in una classe interceptor
+Es. 
+	@AroundInvoke
+	public Object giveDiscount(InvocationContext context) throws Exception {
+		System.out.println("*** DiscountVerifier Interceptor" + " invoked for " + context.getMethod().getName() + " ***");
+		if (context.getMethod().getName().equals("chargePostingFee") && (((String)(context.getContextData().get("MemberStatus"))).equals("Gold"))) {
+			Object[] parameters = context.getParameters();
+			parameters[2] = new Double ((Double) parameters[2] * 0.99);
+			System.out.println ("*** DiscountVerifier Reducing Price by 1 percent ***");
+			context.setParameters(parameters);
+		}
+		return context.proceed();
+	}
+Per utilizzarlo su una classe o su un metodo: @Interceptors({ActionBazaarResourceLogger.class})
+Definizione di uno di default:
+	<assembly-descriptor>
+		<interceptor-binding>
+		<ejb-name>*</ejb-name>
+		<interceptor-class>
+			actionbazaar.buslogic.ActionBazaarLogger
+		</interceptor-class>
+		</interceptor-binding>
+	</assembly-descriptor>
+Esistono funzionalità per rimuovere l'interceptor @ExcludeDefaultInterceptors e @ExcludeClassInterceptors.
+
+
+@Timer utile per schedulare il lancio di alcuni metodi
+ES.
+	public class PlaceBidBean implements PlaceBid {
+		...
+		@Resource TimerService timerService;
+		...
+		public void addBid(Bid bid) {
+			... Code to add the bid ...
+			timerService.createTimer(15*60*1000, 15*60*1000, bid);  //creato il timer
+			...
+		}
+		...
+		@Timeout     //metodo di timeout
+		public void monitorBid(Timer timer) { //Nella  firma c'è la classe timer
+			Bid bid = (Bid) timer.getInfo();
+			... Code to monitor the bid ...
+		}
+	}
+Si può accedere al timer service anche tramite SessionContext
+I timer Ejb sopravvivono al restart dell'EJB Container ma non sono buone per applicazioni realtime
+
+
+---------------- CAPITOLO 6 ----------------
+Context managed transaction: CMT
+Transazionale: ACID(Atomicity, Consistency, isolation, Durability)
+Lock di basso livello sul database per i dati modificati dalla transazione, nessun'altro li può modificare fino a quando non termina la transazione.
+Es.
+	@Stateless
+	@TransactionManagement(TransactionManagementType.CONTAINER) //Utilizzato CMT Container-menaged transaction
+	public class OrderManagerBean {
+		@Resource    															//Inject del contesto utile per il rollback
+		private SessionContext context;
+		...
+		@TransactionAttribute(TransactionAttributeType.REQUIRED)  				//Definito un attributo di transaction per metodo
+		public void placeSnagItOrder(Item item, Customer customer){				//attributi: REQUIRED, REQUIRES_NEW, SUPPORTS, MANDATORY, NOT_SUPPORTED, NEVER
+			try {
+				if (!bidsExisting(item)){
+					validateCredit(customer);
+					chargeCustomer(customer, item);
+					removeItemFromBidding(item);
+				}
+			} catch (CreditValidationException cve) { 							//Roolback in caso di eccezione
+				context.setRollbackOnly();										// il contesto viene marcato "da rollbackare" e fatto successivamente(solo per REQUIRED, REQUIRES_NEW, MANDATORY altrimenti va in eccezione)
+			} catch (CreditProcessingException cpe){
+				context.setRollbackOnly();
+			} catch (DatabaseException de) {
+			}
+		}
+	}
+MDB supporta solo: REQUIRED e NOT_SUPPORTED
+@ApplicationException: utilizzato per gestire i rollback sulle eccezioni
+Es. Rimozione del try catch ed eccezioni personalizzate
+	public void placeSnagItOrder(Item item, Customer customer)throws CreditValidationException,	CreditProcessingException, DatabaseException {
+		if (!bidsExisting(item)){
+			validateCredit(customer);
+			chargeCustomer(customer, item);
+			removeItemFromBidding(item);
+		}
+	}
+	...
+	@ApplicationException(rollback=true)
+	public class CreditValidationException extends Exception {
+	...
+	@ApplicationException(rollback=true)
+	public class CreditProcessingException extends Exception {
+	...
+	@ApplicationException(rollback=false)
+	public class DatabaseException extends	RuntimeException {
+	...
  
+Bean managed transaction: BMT (puo dettagliare le scelte sulle transazioni)
+Es.
+	@Stateless
+	@TransactionManagement(TransactionManagementType.BEAN) //Use BMT
+	public class OrderManagerBean {
+		@Resource
+		private UserTransaction userTransaction;  //Inject User transaction
+		
+		public void placeSnagItOrder(Item item, Customer customer){
+			try {
+				userTransaction.begin();   //Start transaction
+				if (!bidsExisting(item)){
+					validateCredit(customer);
+					chargeCustomer(customer, item);
+					removeItemFromBidding(item);
+				}
+				userTransaction.commit();   //Commit transaction
+				
+			} catch (CreditValidationException cve) { //Rolls back sulle eccezioni
+				userTransaction.rollback();
+			} catch (CreditProcessingException cpe){
+				userTransaction.rollback();
+			} catch (DatabaseException de) {
+				userTransaction.rollback();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	
+Continua da pagina 197
+ 
+ 
+ 
+ 
+ 
+ 
