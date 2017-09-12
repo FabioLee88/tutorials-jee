@@ -447,10 +447,651 @@ Es.
 	}
 
 	
-Continua da pagina 197
+L'oggetto user transaction oltre tramite @resource può essere invocato mediante 2 metodi:
+- JNDI Lookup
+	Context context = new InitialContext();
+	UserTransaction userTransaction = UserTransaction) context.lookup("java:comp/UserTransaction");
+	userTransaction.begin();
+	// Perform transacted tasks.
+	userTransaction.commit();
+- EjbContext:
+	@Resource
+	private SessionContext context;
+	...
+	UserTransaction userTransaction = context.getUserTransaction();
+	userTransaction.begin();
+	// Perform transacted tasks.
+	userTransaction.commit();
  
- 
- 
- 
+EJB 3 e Java EE SECURITY
+La sicurezza di Java EE è basata sulla Java Authentiucation and Authorization Service (JAAS) API.
+JAAS separa l'autenticazione dal sistema tramite un'API pluggabile e quindi sostituibile senza cambiare il codice.
+PRINCIPAL: utente validato
+Di solito il Web Tier effettua l'autenticazione e passa il Pricipal all'EJb tier, quando non può più essere passata la validazione viene effettuata nuovamente
+L'autenticazione è configurabile nel web.xml tramite i tag login-config e security-costraint
+Es.
+	<login-config>
+		<auth-method>BASIC</auth-method>			//Attivazione del controllo da parte del container
+		<realm-name>ActionBazaarRealm</realm-name>  //Astrazione di un JAAS container
+	</login-config>
+	...
+	<security-constraint>
+		<web-resource-collection>
+			<web-resource-name>
+				ActionBazaar Administrative Component
+			</web-resource-name>
+			<url-pattern>/admin/*</url-pattern> //path da mettere in sicurezza
+		</web-resource-collection>
+		<auth-constraint>
+			<role-name>CSR</role-name> // gruppo di utenti che può accedere all'area protetta
+		</auth-constraint>
+	</security-constraint>
+
+
+Auth method: BASIC usa l'header del protocollo http, FORM come BASIC ma con un form, CLIENT-CERT usa connesione SSL con i certificati salvati nel browser 
+
+DECLARATIVE SECURITY
+Es. 
+	@DeclareRoles("BIDDER", "CSR", "ADMIN") //Dichiara i tuoli per ilo bean
+	@Stateless
+	public class BidManagerBean implements BidManager {
+		
+		@RolesAllowed("CSR, ADMIN")				//dichiara ruoli che accedono al metodo
+		public void cancelBid(Bid bid, Item item) {...}
+		
+		@PermitAll								// tutti possono accedere al metodo (l'opposto @DenyAll)
+		public List<Bid> getBids(Item item) {...}
+	}
+
+Si potrebbe definire i Roles direttamente per tutto l'ejb module tramite deployment descriptor
+
+@RunAs utile a lanciare un metodo con un ruolo ben definito
+Es.
+	@RunAS("ADMIN")
+	@RolesAllowed("CSR")
+	public void cancelBid(Bid bid, Item item) {...}
+	
+PROGRAMMATIC SECURITY
+gestire manualmente la sicurezza.
+Es.
+	@Stateless
+	public class BidManagerBean implements BidManager {
+	@Resource SessionContext context;											//Inject Context
+		...
+		public void cancelBid(Bid bid, Item item) {
+			if (!context.isCallerInRole("CSR")) {								//Verifica Ruolo, (getCallerPrincipal() restituisce il Principal loggato)
+				throw new SecurityException("No permissions to cancel bid"); 	//Eccezione sicurezza
+			}
+			...
+		}
+		...
+	}
+
+Di solito si utilizza la sicurezza programmaticamente tramite l'aiuto degli interceptor che eseguono il lavoro in maniera "nascosta"
+
+---------------- PARTE 3 - JPA ----------------
+---------------- CAPITOLO 7 ----------------
+
+@Entity, @Embedded, @Id, @OneToMany, @OneToOne, @ManyToMany, @ManyToOne, @Table, @Column, @JoinColumn
+
+@Transient: non salvato sul DB
+
+Annotazioni utili a definire l'identificativo:
+- @Id: chiave semplice
+- @IdClass: chiave composta
+	public class CategoryPK implements Serializable {
+		String name;
+		Date createDate;
+		public CategoryPK() {}
+		public boolean equals(Object other) {		// metodo di confronto
+			if (other instanceof CategoryPK) {
+				final CategoryPK otherCategoryPK = (CategoryPK)other;
+				return (otherCategory.name.equals(name) &&
+				otherCategoryPK.createDate.equals(createDate));
+			}
+			return false;
+		}
+		public int hashCode() {
+			return super.hashCode();
+		}
+	}
+	@Entity
+	@IdClass(CategoryPK.class)    //Classe che indentifica la chiave primaria
+	public class Category {
+		public Category() {}
+		@Id
+		protected String name;
+		@Id
+		protected Date createDate;
+		...
+	}
+- @EmbeddedId: chiave composta ma la classe che identifica la chiave è incorporata nell'entity
+Es.
+	@Embeddable
+	public class CategoryPK {
+		String name;
+		Date createDate;
+		public CategoryPK() {}
+		public boolean equals(Object other) {
+			if (other instanceof CategoryPK) {
+				final CategoryPK otherCategoryPK = (CategoryPK)other;
+				return (otherCategory.name.equals(name) &&
+				otherCategoryPK.createDate.equals(createDate));
+			}
+			return false;
+		}
+		public int hashCode() {
+			return super.hashCode();
+		}
+	}
+	@Entity
+	public class Category {
+		public Category() {}
+		@EmbeddedId
+		protected CategoryPK categoryPK;
+		...
+	}
+
+Es.2
+	@Embeddable
+	public class Address {
+		protected String streetLine1;
+		protected String streetLine2;
+		protected String city;
+		protected String state;
+		protected String zipCode;
+		protected String country;
+		...
+	}
+	@Entity
+	public class User {
+		@Id
+		protected Long id;
+		protected String username;
+		protected String firstName;
+		protected String lastName;
+		@Embedded
+		protected Address address;
+		protected String email;
+		protected String phone;
+		...
+	}
+
+
+Es. @OneToOne bidirezionale:
+	@Entity
+	public class User {
+		@Id
+		protected String userId;
+		protected String email;
+		@OneToOne
+		protected BillingInfo billingInfo;
+	}
+	@Entity
+	public class BillingInfo {
+		@Id
+		protected Long billingId;
+		protected String creditCardType;
+		..
+		protected String routingNumber;
+		@OneToOne(mappedBy="billingInfo", optional="false");
+		protected User user;
+	}
+
+Es. OneToMany bidirezionale
+	@Entity
+	public class Item {
+		@Id
+		protected Long itemId;
+		protected String title;
+		protected String description;
+		protected Date postdate;
+		...
+		@OneToMany(mappedBy="item")
+		protected Set<Bid> bids;
+		...
+	}
+	@Entity
+	public class Bid {
+		@Id
+		protected Long bidId;
+		protected Double amount;
+		protected Date timestamp;
+		...
+		@ManyToOne
+		protected Item item;
+		...
+	}
+
+Es. ManyToMany
+	@Entity
+	public class Category {
+		@Id
+		protected Long categoryId;
+		protected String name;
+		...
+		@ManyToMany
+		protected Set<Item> items;
+		...
+	}
+	@Entity
+	public class Item {
+		@Id
+		protected Long itemId;
+		protected String title;
+		...
+		@ManyToMany(mappedBy="items")
+		protected Set<Category> categories;
+		...
+	}
+
+---------------- CAPITOLO 8 ----------------
+@Enumerated: utile a definire tipi enumerativi
+@Lob: per denotare campi BloB o Clob(salvataggio immagini sul db)
+Es.
+	@Lob
+	@Basic(fetch=FetchType.LAZY)
+	protected byte[] picture;
+
+@temporal: utilizzato per definire le date(date, time, timestamp)
+Una Entity può essere mappata a più tabelle utilizzando l'annotazione @SecondaryTable
+Es.
+	@Entity
+	@Table(name="USERS")
+	@SecondaryTable(name="USER_PICTURES", pkJoinColumns=@PrimaryKeyJoinColumn(name="USER_ID"))
+	public class User implements Serializable {
+	..
+Es. One to one con @PrimaryKeyJoinColumn
+	@Entity
+	@Table(name="USERS")
+	public class User {
+		@Id
+		@Column(name="USER_ID")
+		protected Long userId;
+		...
+		@OneToOne
+		@PrimaryKeyJoinColumn(name="USER_ID", referencedColumnName="BILLING_USER_ID")
+		protected BillingInfo billingInfo;
+	}
+	
+	@Entity
+	@Table(name="BILLING_INFO")
+	public class BillingInfo {
+		@Id
+		@Column(name="BILLING_USER_ID")
+		protected Long userId;
+		...
+	}
+Es. One to many bidirectional
+	@Entity
+	@Table(name="ITEMS")
+	public class Item {
+		@Id
+		@Column(name="ITEM_ID")
+		protected Long itemId;
+		...
+		@OneToMany(mappedBy="item")
+		protected Set<Bid> bids;
+		...
+	}
+	@Entity
+	@Table(name="BIDS")
+	public class Bid {
+		@Id
+		@Column(name="BID_ID")
+		protected Long bidId;
+		...
+		@ManyToOne
+		@JoinColumn(name="BID_ITEM_ID",
+		referencedColumnName="ITEM_ID")
+		protected Item item;
+		...
+	}
+
+Es. Many to many
+@Entity
+@Table(name="CATEGORIES")
+public class Category implements Serializable {
+	@Id
+	@Column(name="CATEGORY_ID")
+	protected Long categoryId;
+	@ManyToMany
+	@JoinTable(name="CATEGORIES_ITEMS", 
+		joinColumns= @JoinColumn(name="CI_CATEGORY_ID", referencedColumnName="CATEGORY_ID"),
+		inverseJoinColumns= @JoinColumn(name="CI_ITEM_ID", referencedColumnName="ITEM_ID"))
+	protected Set<Item> items;
+	...
+}
+@Entity
+@Table(name="ITEMS")
+public class Item implements Serializable {
+	@Id
+	@Column(name="ITEM_ID")
+	protected Long itemId;
+	...
+	@ManyToMany(mappedBy="items")
+	protected Set<Category> categories;
+	...
+}
+Es.Single table: Creare una colonna che funga da discriminante tra due entità sulla stessa tabella(utilizzo dell'ereditarietà)
+	@Entity
+	@Table(name="USERS")
+	@Inheritance(strategy=InheritanceType.SINGLE_TABLE)
+	@DiscriminatorColumn(name="USER_TYPE", discriminatorType=DiscriminatorType.STRING, length=1)
+	public abstract class User ...
+	
+	@Entity
+	@DiscriminatorValue(value="S")
+	public class Seller extends User ...
+	
+	@Entity
+	@DiscriminatorValue(value="B")
+	public class Bidder extends User
+
+Es. La Join Tables Strategy: la tabella comune contiene solo colonne comuni, le altre due tabelle sono in join per completare le 2 entità
+	@Entity
+	@Table(name="USERS")
+	@Inheritance(strategy=InheritanceType.JOINED)
+	@DiscriminatorColumn(name="USER_TYPE", discriminatorType=STRING, length=1)
+	public abstract class User ...
+	
+	@Entity
+	@Table(name="SELLERS")
+	@DiscriminatorValue(value="S")
+	@PrimaryKeyJoinColumn(name="USER_ID")
+	public class Seller extends User ...
+	
+	@Entity
+	@Table(name="BIDDERS")
+	@DiscriminatorValue(value="B")
+	@PrimaryKeyJoinColumn(name="USER_ID")
+	public class Seller extends User ...
+	
+Es. table-per-class - tabelle completamente dedicate ad una classe, anche se hanno colonne con stesso nome
+	@Entity
+	@Table(name="USERS")
+	@Inheritance(strategy=InheritanceType.TABLE_PER_CLASS)
+	public class User {
+	...
+	@Entity
+	@Table(name="SELLERS")
+	public class Seller extends User {
+	...
+	@Entity
+	@Table(name="BIDDERS")
+	public class Bidder extends User {
+	
+---------------- CAPITOLO 9 ----------------	
+L'Entitymanager si occupa del ciclo di vita delle entity e di aggiornare le entity con lo stato del Db fino a quando sono attached
+Un'entity diventa attached quando vengono utilizzati i metodi come persist, merge, refresh o tramite un find
+Il detach avviene quando la entity esce dallo scope dell'entity manager, ad es viene passata tra i vari livelli, come al web tier, una volta che la entity ritorna è possibile utilizzare il merge per aggiornare la entity attached.
+Im metodo clear dell'entity manager detacha tutte le entity, inoltre le entity si detachano tramite clonazione e serializzazione.
+Il metodo remove oltre a rimouvere l'entity dal db esegue il detach.
+	
+Un persistence context è una collezione di entità gestite da entitymanager durante un dato persistence scope(resta in vita per la durate delle entity attached).
+Transaction-scoped entity manager: le entità vengono detachate al termine di ogni transazione(ciclo di vita del persistence context, scope e EM in ogni transazione) 
+Extended Entity Manager: sopravvive a più transazioni( utilizzato solo per stateful session bean)
+E. 
+	@PersistenceContext(name="", //nome JNDI del persistence context	
+						unitName = "actionBazaar", //nome della persistence unit, raggrupa entity(GENERAL, ADMIN) 
+						type = PersistenceContextType.EXTENDED, //default TRANSACTION
+						properties= ""
+						)
+	private EntityManager entityManager;
+	...
+Per configurare il contesto di persistenza si deve utilizzare il file persistence.xml (deployment descriptor)	
+L'EntityManager non è thread safe ma L'entityManagerFactory si, quindi si potrebbe gestire manualemte il thread safe in un sistema EE tramite application-managed Entitymanager
+Es.
+	@Stateless
+	public class ItemManagerBean implements ItemManager {
+		@PersistenceUnit
+		private EntityManagerFactory entityManagerFactory;
+		private EntityManager entityManager;
+		public ItemManagerBean() {}
+		
+		@PostConstruct
+		public void initialize() {
+			entityManager = entityManagerFactory.createEntityManager();
+		}
+		...
+		public Item updateItem(Item item) {
+			entityManager.joinTransaction();
+			entityManager.merge(item);
+			return item;
+		}
+		...
+		@PreDestroy
+		public void cleanup() {
+			if (entityManager.isOpen()) {
+				entityManager.close();
+			}
+		}
+		...
+	}
+	
+In Java SE JTA non è utilizzabile e quindi bisogna implementarla manualmente
+Es.
+	EntityManagerFactory entityManagerFactory =
+	Persistence.createEntityManagerFactory("actionBazaar");
+	EntityManager entityManager = entityManagerFactory.createEntityManager();
+	try
+	{
+		EntityTransaction entityTransaction = entityManager.getTransaction();
+		entityTransaction.begin();
+		entityManager.persist(item);
+		entityTransaction.commit();
+	}
+	finally
+	{
+		entityManager.close();
+		entityManagerFactory.close();
+	}
+	
+Utilizzo di JPA	in un web container e il ThreadLocal pattern
+Su, ad esempio tomcat e jetty alcuni provider di persistenza come hibernate raccomandano l'utilizzo del pattern threadLocal dove ogni singola istanza di un entityManager viene inserita all'interna di un singolo thread
+Es.
+	private static EntityManagerFactory emf;
+	public static final ThreadLocal<EntityManager> _threadLocal = new ThreadLocal<EntityManager>();
+	public static EntityManagerFactory getEntityManagerFactory() {
+		if (emf == null) {
+			emf = Persistence.createEntityManagerFactory("actionBazaar");
+		}
+		return emf;
+	}
+	public static EntityManager getEntityManager() {
+		EntityManager entityManager = _threadLocal.get();
+		if (entityManager == null) {
+			entityManager = emf.createEntityManager();
+			_threadLocal.set(entityManager);
+		}
+		return entityManager;
+	}
+	
+Se una entity ha una relazione one-to-one e si vuole eseguire un persist delle due entità simultaneamente si può fare(id vuoto delle entity)
+Es. 
+	public User addUser(String username, String email, String creditCardType, String creditCardNumber, Date creditCardExpiration) {
+		User user = new User();
+		user.setUsername(username);
+		user.setEmail(email);
+		BillingInfo billing = new BillingInfo();
+		billing.setCreditCardType(creditCardType);
+		billing.setCreditCardNumber(creditCardNumber);
+		billing.setCreditCardExpiration(creditCardExpiration);
+		user.setBillingInfo(billing);									//Innestata un'entità nell'altra(2 nuove entità non attached)
+		entityManager.persist(user);						//persist(salvataggio di due entità)
+		return user;
+	}	
+	
+	...Codice entity
+	public class User {
+		@OneToOne(cascade=CascadeType.PERSIST)  // Operazione da eseguire a cascata(MERGE,PERSIST, REFRESH, REMOVE e ALL)
+		public void setBillingInfo(BillingInfo billing) {
+		...
+	
+Modi per fare il fetch dei dati dal Database da parte dell'entity manager:
+- Eager(avido): scarica tutti i dati al momento della richiesta(molto + oneroso come per le immagini)	
+- LAZY(pigro): si crea un riferimento alkll'elemento del db ma non vengono caricate le singole colonne, i dati vengono recuperati al momento della prima getX() chiamata
+Si usa l'annotazione sulla colonna @Basic(fetch=FetchType.LAZY)
+Se un'entità è corredata da una relazione come ad esempio one-to-many al caricamento dal db di quella entità verranno recuperate anche le altre associate.
+Di Default queste entità correlate vengono caricate in maniera lazy per one-to-many e per many-to-many, Eager per one-to-one e many-to-one, ma è possibile personalizzarle tramite l'attributo fetch
+EntityManager.merge(Item xx) serve per aggiornare sul db una entity che è stata detachata.Se non la trova lancia una IllegalStateException
+Se nell'entity manager viene settato @ManyToOne(cascade=CascadeType.MERGE)	 oppure ALL allora verranno mergiate anche le inner entity
+Lo stesso vale per il delete: @OneToOne(cascade=CascadeType.REMOVE) o ALL
+	
+FLUSH dell'EntityManager: settato ad AUTO di default.
+i persist, merge e remove a volte non vengono fatti istantaneamente, il flush viene posticipato a momenti più opportuni per ottimizzare le risorse.
+Si può gestire il flush tramite l'entitymanager.setFlushMode(FlushModetype.COMMIT) (: ogni transazione di commit verso il Db viene flushata)
+Avvio del flush manualmente entityManager.flush()
+La funzionalità Entitymanager.refresh() forza il ricaricamento dell'entità dal database.
+Ci sono degli Entity Listener (come interceptor) per le JPA e sono: @PrePersist, @PostPersist, @PostLoad, @PreUpdate, PostUpsate, @PreRemove, @PostRemove
+Es.
+	public class ItemMonitor {
+		...
+		public ItemMonitor() {}
+		@PrePersist
+		@PreUpdate
+		public void monitorItem(Item item) {
+			if (item.getInitialBidAmount() > ItemMonitor.MONITORING_THRESHOLD) {
+				notificationManager.sendItemPriceEmailAlert(item);
+			}
+		}
+	}
+	@Entity
+	@EntityListeners(actionbazaar.persistence.ItemMonitor.class)
+	public class Item implements Serializable {
+	...
+
+Per impostare un listener di default su tutte le entity si usa il deployment descriptor nel file persistence.xml
+Es. Logger sulle remove
+	LoggerClass:
+	public class ActionBazaarAuditor {
+	...
+	@PrePersist
+	@PostPersist
+	...
+	@PostRemove
+	public void logOperation(Object object) {
+	Logger.log("Performing Persistence Operation on: " + object.getName());
+	
+	persistence.xml:
+	<persistence-unit name="actionBazaar">
+		...
+		<default-entity-listeners>
+			actionbazaar.persistence.ActionBazaarAuditor.class
+		</default-entity-listeners>
+		...
+
+Viene eseguito prima il default listener, poi i listener della superclasse e poi quelli della sottoclasse.
+
+Ci sono modi per evitare che vengano lanciati i listener su una determinata entity
+Es.
+	@Entity
+	@ExcludeDefaultListeners  //Esclude il listener di default
+	@ExcludeSuperClassListeners  //Esclude i listener delle classi padre
+	@EntityListeners(actionbazaar.persistence.SellerMonitor.class) // definisce un entity listener(o più di uno)
+	public class Seller extends User {
+
+---------------- CAPITOLO 10 ----------------	
+Con le JPA ci sono tre modi per recuperare i dati:
+- EntityManager.find
+- Query scritte in JPQL
+- Query SQL native sul database sottostante
+
+Ci sono due tipi di query: 
+- named: Possono essere memorizzate e riutilizzate
+- dynamic: query che viene composta dinamicamente in base al tipo di entità, stato, input...
+Es.
+	@PersistenceContext em; //entityManager
+	...
+	public List findAllCategories() {
+		Query query = em.createQuery("SELECT c FROM Category c"); ... //Query dinamica ( per creare una named query si usa createNamedQuery(String name))
+		return query.getResultList(); ............
+	}
+
+Per creare una named query si possono utilizzare delle annotazioni oppure definirla come metadata in file XML.
+Es. named query con annotazioni
+	@Entity
+	@NamedQuery(
+		name = "findAllCategories",
+		query = "SELECT c FROM Category c WHERE c.categoryName LIKE :categoryName ")
+	public class Category implements Serializable {
+		..
+	}
+Es. multiple query
+	@Entity
+	@NamedQueries({
+		@NamedQuery(
+			name = "findCategoryByName",
+			query = "SELECT c FROM Category c WHERE c.categoryName LIKE :categoryName order by c.categoryId"
+		),
+		@NamedQuery(
+			name = "findCategoryByUser",
+			query = "SELECT c FROM Category c JOIN c.user u WHERE u.userId = ?1"
+		)
+	})
+	@Table(name = "CATEGORIES")
+	public class Category implements Serializable {
+	}
+
+Il "name" deve essere unico!
+
+public Query createQuery(String qlString); Creates a dynamic query using a JPQL statement.
+public Query createNamedQuery(String name); Creates a query instance based on a named query. This method can be used for both JPQL and native SQL queries.
+public Query createNativeQuery( String sqlString); Creates a dynamic query using a native SQL statement with UPDATE or DELETE.
+public Query createNativeQuery( String sqlString,Class result-class); Creates a dynamic query using a native SQL statement that retrieves a single entity type.
+public Query createNativeQuery( String sqlString,String result-setMapping); Creates a dynamic query using a native SQL statement that retrieves a result set with multiple entity types.
+
+Es. creazione named query
+	Query query = em.createNamedQuery("findAllCategories");
+	
+Es. named query con parametri
+	query = em.createNamedQuery("findCategoryByName");
+	query.setParameter("categoryName", categoryName);
+	query.setMaxResults(10);
+	query.setFirstResult(3);
+	List categories = query.getResultList();
+
+Se nella named query ci sono dei parametri sono con il punto interrogativo oppure con i due punti
+Es. 
+	SELECT i FROM Item i WHERE i.initialPrice > ?1 AND i.initialPrice < ?2
+
+	query.setParameter(1, 100.00);
+	query.setParameter(2, 200.00);
+Es.2
+	SELECT i FROM Item i WHERE i.initialPrice = :price
+
+	query.setParameter("price", 100.00);
+
+Recupero di un risultato singolo: Category cat = (Category)query.getSingleResult(); (se ne trova 0 o piu di uno va in eccezione)
+
+
+//*/*/*/*/*/ Continua da pagina 351: Pagination
+
+
+
+
+
+
+
+		
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+
+
  
  
