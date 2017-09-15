@@ -1054,7 +1054,7 @@ Es. named query con parametri
 Se nella named query ci sono dei parametri sono con il punto interrogativo oppure con i due punti
 Es. 
 	SELECT i FROM Item i WHERE i.initialPrice > ?1 AND i.initialPrice < ?2
-
+	---
 	query.setParameter(1, 100.00);
 	query.setParameter(2, 200.00);
 Es.2
@@ -1063,35 +1063,420 @@ Es.2
 	query.setParameter("price", 100.00);
 
 Recupero di un risultato singolo: Category cat = (Category)query.getSingleResult(); (se ne trova 0 o piu di uno va in eccezione)
+Es. Paginazione
+	query.setMaxResults(50);
+	query.setFirstResult(0);
+	List items = query.getResultList();
+	---
+	query.setMaxResults(50);
+	query.setFirstResult(50);
+	List items = query.getResultList();
+
+Il flush mode altre che a essere applicato sull'entityManager può anche essere applicato sulla singola query: Query.setFlushMode(..)
+
+Specifica di Hint per le query: 
+Es. dinamyc query
+	query.setHint("toplink.jdbc.timeout", new Integer(10000));
+Es.	named querey
+	@NamedQuery(
+		name = "findUserWithNoItems",
+		query = "SELECT DISTINCT u FROM User u WHERE u.items is EMPTY",
+		hints = { @QueryHint(name = "org.hibernate.timeout", value = "10") }
+	)
+Altri parametri di Hint sono fetch-size, cache-usage e refresh.
+
+JPQL Query->JPQL Processor->SQL Query
+la definizione delle tabella nelle query JPQL deve seguire la nomenclatura delle annotazioni:
+Es. 
+	@Entity(name = "CategoryEntity")
+	public class Category
+	---
+	FROM CategoryEntity c
+
+Es. Come mappare il result set di una query nativa
+1) 
+	Query q = em.createNativeQuery(
+	"SELECT user_id, first_name, last_name FROM users WHERE user_id IN (SELECT seller_id FROM items GROUP BY seller_id HAVING COUNT(*) > 1)",
+	actionbazaar.persistence.User.class
+	);
+	return q.getResultList();
+2)
+	@SqlResultSetMapping(name = "UserResults",
+		entities = @EntityResult(
+		entityClass = actionbazaar.persistence.User.class))
+	...
+	Query q = em.createNativeQuery("SELECT user_id, first_name, last_name FROM users WHERE user_id IN (SELECT seller_id FROM items GROUP BY seller_id HAVING COUNT(*) > 1)",
+	"UserResults");
+	return q.getResultList();
 
 
-//*/*/*/*/*/ Continua da pagina 351: Pagination
+Es. Named native query con annotazioni
+	@NamedNativeQuery(
+	name = "findUserWithMoreItems",
+	query = "SELECT user_id , first_name , last_name, birth_date
+				FROM users
+				WHERE user_id IN
+					( SELECT seller_id
+					FROM items
+					GROUP BY seller_id HAVING COUNT(*) > ?)",
+	hints = {@QueryHint(name = "toplink.cache-usage", value="DoNotCheckCache")},
+	resultClass = actionbazaar.persistence.User.class) // si può utilizzare il @SqlResultSetMapping
+	---
+	return em.createNamedQuery("findUserWithMoreItems")
+	.setParameter(1, 5)
+	.getResultList();
+
+	
+---------------- CAPITOLO 11 ----------------
+Gli EJB vengono eseguiti in un EJB Container
+Web Application come servlet e JSF vengono eseguiti in web container.
+Per eseguire una applicazione c'è bisogno di un Java EE application server: deployment.
 
 
+CAR->Client application archives->application-client.xml->Thick Java client for EJBs.
+EAR->Enterprise application archive->application.xml->Other Java EE modules such as EJB-JARs.
+EJB-JAR->EJB Java archive->ejb-jar.xml->Session beans, message-driven beans, and optionally entities. Needs a persistence.xml if entities are packaged.
+RAR->Resource adapter archives->ra.xml->Resource adapters.
+WAR->Web application archives->web.xml->Web application artifacts such as servlets, JSPs, JSF, static files, etc. Entities can also be packaged in this module. Needs a persistence.xml if entities are packaged.
 
+HAR->Hibernate Archieve
 
-
-
-
+Per creare questi file c'è bisogno di un jar tool presente nella JDK, alla fine tutti i jar vengono raggruppati in un ear.
+Ogni jar contiene un file deployment descriptor opzionale che descrive l'archivio.
+Es. Contenuto di un ear
+	META-INF/application.xml
+	actionBazaar-ejb.jar
+	actionBazaar.war
+	actionBazaar-client.jar
+	lib/actionBazaar-commons.jar
 		
+Es. Contenuto di application.xml
+	<application>
+		<module>
+			<ejb>actionBazaar-ejb.jar</ejb>	//EJB MODULE
+		</module>
+		<module>
+			<web>
+				<web-uri>actionBazaar.war</web-uri>	//WEB MODULE
+				<context-root>ab</context-root>
+			</web>
+		</module>
+		<module>
+			<java>actionBazaar-client.jar</java>	//APPLICATION CLIENT MODULE
+		</module>
+	</application>
 	
+Se si impacchettano le classi in un modulo EJB, esse saranno visibili solo in quel modulo.
+Per rendere condivise classi utility o helper bisogna creare un modulo libreria in un EAR.
+
+Dopo aver creato tutte le classi del core EJB bisogna assemblarle in un file Jar come un EJB-JAR e deployarle in un application server.
+Il deployment descriptor ejb-jar.xml descrive il conetnuto dell'EJB-JAR come beans, interceptors, risorse che utilizza, sicurezza, transazioni, ecc..
+Per creare il file EJB-JAR che contiene i componenti EJB, le cklassi si compilano tramite lo strumento "jar" fornito dalla JDK.
+Es. 
+	jar cvf adventure-ejb.jar * 	//creerà un jar contenente tutti i file della directory corrente e di tutte le sue sottodirectory
+
+Ci sono tanti tool che vengono utilizzati per semplificare la build del jar come Apache Ant e Apache Maven.
+Es. File ant per compilare e fare build delle classi EJB
+	...
+	<target name="compile-ejb-classes" depends="setup">									Compile EJB Classes
+		<echo message="-----> Compiling EJBs"/>
+		<javac srcdir="${src.ejb.dir}" destdir="${bld.ejb.dir}" debug="on">
+			<classpath>
+				<pathelement path="${common.j2ee.class.path}"/>
+				<pathelement location="${bld.ejb.dir}"/>
+				<pathelement location="${lib.dir}/${ejb.name}.jar"/>
+			</classpath>
+		</javac>
+	</target>
+	<target name="ejb-descriptor" depends="setup">										//Copy deployment descriptors
+		<copy todir="${bld.ejb.dir}/META-INF">
+		<fileset dir="${etc.dir}" includes="ejb-jar.xml, persistence.xml"/>
+		</copy>
+	</target>
+	<target name="package-ejb" depends="compile-ejb-classes,ejb-descriptor">			//Builds EJB-JAR
+		<echo message="-----> Create EJB JAR file"/>
+		<jar jarfile="${bld.ear.dir}/${ejb.name}.jar">
+			<fileset dir="${bld.ejb.dir}" includes="**"/>
+		</jar>
+	</target>
+	...
 	
+Le classi helper possono:
+- Il Jar contenente le classi helper deve essere inpacchettato in una directory lib di un EAR file.
+	Con questo approccio le classi saranno automaticamente visibili a tutti i moduli dell'EAR.
+- Per limitare la visibilità ad esclusivamente un modulo EJB-JAR oppure WAR si può creare una entry nel file Manifest.mf del modulo che contiene il Class-Path del file Jar.
+
+Si consiglia di utilizzare le annotazioni per lo sviluppo(develop) e i deployment descriptor per il deploy.
+POichè i deployment descriptor sono file xml che sono esterni al bytecode generato dai file Java e potrebbero cambiare frequentemente(test, produzione, develop...).	
+Il deployment descriptor vince sulle annotazioni in caso di conflitto.
+Un EJB-JAR deve contenere un deployment descriptor ebj-jar.xml e uno specifico delpoyment descriptor per vendor(jboss, glassfish...) utile ad eseguire determinate configurazioni per l'EJB container	
+Es. ejb-jar.xml
+	<ejb-jar version="3.0">																	//Specifica la versione dell'elemento
+		<enterprise-beans>
+			<session>
+				<ejb-name>BazaarAdmin</ejb-name>											//Identificatore EJB
+				<remote>actionbazaar.buslogic.BazaarAdmin</remote>
+				<ejb-class>actionbazaar.buslogic.BazaarAdminBean</ejb-class>
+				<session-type>stateless</session-type>										//Specifica del tipo di bean
+				<transaction-type>Container</transaction-type>								//Specifica del tipo di transazione
+			</session>
+		</enterprise-beans>
+		...
+		<assembly-descriptor>
+			<container-transaction>															//Contiene le impostazioni per le transazioni
+				<method>
+					<ejb-name>BazaarAdmin</ejb-name>
+					<method-name>*</method-name>
+				</method>
+				<trans-attribute>Required</trans-attribute>
+			</container-transaction>
+			<security-role>
+				<role-name>users</role-name>												//Specifica impostazioni sulla sicurezza		
+			</security-role>
+		</assembly-descriptor>
+		
+		...
+		<interceptor-binding>																//Specifica il collegamento con gli interceptors
+			<ejb-name>*</ejb-name>															// Applica il collegamento a tutti gli EJBs
+			<interceptor-class>
+				actionbazaar.buslogic.CheckPermissionInterceptor
+			</interceptor-class>
+			<interceptor-class>
+				actionbazaar.buslogic.ActionBazaarDefaultInterceptor
+			</interceptor-class>
+		</interceptor-binding>
+		...
+
+	</ejb-JAR>
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+Per la maggiorparte delle annotazioni viste in precedenza c'è il corrispettivo attributo del delployment descriptor
+Vendor deployment descriptor:
+	BEA WebLogic => weblogic-ejb-jar.xml
+	IBM WebSphere => ibm-ejb-jar.xml
+	JBoss => jboss.xml
+	Oracle Application Server => orion-ejb-jar.xml
+	Sun GlassFish => sun-ejb-jar.xml
+
+Alcuni vendor forniscono delle prorpie annotazioni per fornire configurazioni
+Es. Oracle fornisce descriptor e annotazioni per la gestione del pooling dgli stateless bean
+	import oracle.j2ee.ejb.StatelessDeployment;
+	@StatelessDeployment(minInstances = 100, maxInstances = 500, poolCacheTimeout = 120)
+	@Stateless(name = "BazaarAdmin")
+	public class BazaarAdminBean implements BazaarAdmin {
+	}
+Es. nel deployment descriptor del vendor: orion-ejb-jar.xml
+	<session-deployment
+		name = "BazaarAdmin"
+		tx-retry-wait = "60"
+		max-instances = "500"
+		min-instances = "100"
+		pool-cache-timeout = "120"
+		location = "BazaarAdmin">
+	</session-deployment>
+
+Le entity possono esssere utilizzate o dentro EJB(EJB-JAR), Web Container(WAR) oppure java SE application(JAR).
+Possono essere pacchettizzate nella root di un modulo EAR o come modulo libreria in un EAR.
+Utilizza il deployment descriptor persistence.xml
+Se si utilizzano le entity all'interno di un modulo EJB, allora la classe EJB (session bean o MDB) e le entities devono essere inpacchettate insieme nello stesso modulo EJB.
+Perciò l'EJB-JAR conterrà un file perstistence.xml per indicare che il modulo contiene uno o più perstistence units.
+La perstistence unit è un gruppo logico di entities usati insieme.(Es. Creare un'unico PU per l'applicazione ActionBazar)
+Es. struttura semplice di un file EJB-JAR
+ActionBazaar-ejb.jar:
+	META-INF/
+		persistence.xml
+		orm.xml (optional)					// Default O/R mapping file
+	actionbazaar/
+		persistence/
+		Category.class
+		Item.class
+		...
+		BazaarAdmin.class
+	...
+		secondORMap.xml						//Additional O/R mapping file per entità non mappate nel orm.xml
+
+Il file orm.xml definisce il mapping object-relazional(se si utilizza una mappatura XML)
+Es. perstince.xml
+	<persistence>
+		<persistence-unit name = "actionBazaar" transaction-type = "JTA">							//Persistence Unit
+			<provider>																				//Factory class for persistence provider
+				oracle.toplink.essentials.PersistenceProvider
+			</provider>
+			<jta-data-source>jdbc/ActionBazaarDS</jta-data-source>									//data source utilizzato dal persistence unit
+			<mapping-file>secondORMap.xml</mapping-file>
+			<jar-file>entities/ShippingEntities.jar</jar-file>
+			<class>ejb3inaction.persistence.Category</class>										//Entity class utilizzata nella PU
+			<class>ejb3inaction.persistence.Bid</class>.
+			...
+			<properties> 
+				<property name = "toplink.ddl-generation" value = "drop-and-create-tables"/>		//vendor specific properties
+			</properties>
+		</persistence-unit>
+	</persistence>
+
+Ogni PU deve avere un nome(univoco tra i moduli Java EE), ci possono esseere anche più di una PU nel file.
+Se in un ear ci sono due PU con stesso nome in moduli diversi ma uno è in lib allora di default verrà usato quello locale al modulo.
+Nel persistence.xml si può definire il transaction-type.
+Nel perstistence.xml bisogna specificare, se si usa un perstistence provider, qual'è
+Es.
+	<provider>org.hibernate.ejb.HibernatePersistence</provider>
+Quando viene memorizzata una istanza di una entity, il perstistence provide apre o riutilizza una pooled connection al database ed esegue lo script.
+
+Per configurare la connesione di una PU al database bisogna creare per prima cosa un dataSource nel Java EE Container.
+Ogni DataSource è associata ad un connection pool che a sua volta contiene informazione per la connesione al DB.
+Ogni application server Java EE fornisce la possibilità di creare e gestire dei data source e connection pools.
+Es. Glassfish
+	<jdbc-connection-pool
+			connection-validation-method = "auto-commit"
+			datasource-classname = "oracle.jdbc.pool.OracleDataSource"
+			max-pool-size = "32"
+			max-wait-time-in-millis = "60000"
+			name = "ActionBazaarDS"
+			res-type = "javax.sql.DataSource"
+			steady-pool-size = "8">
+		<property name = "user" value = "ejb3ina"/>
+		<property name = "port" value = "1521"/>
+		<property name = "password" value = "ejb3ina"/>
+		<property name = "networkProtocol" value = "thin"/>
+		<property name = "databaseName" value = "ORCL"/>
+		<property name = "serverName" value = "localhost"/>
+	</jdbc-connection-pool>
+	<jdbc-resource enabled = "true"
+		jndi-name = "jdbc/ActionBazaarDS"
+		pool-name = "ActionBazaarDS"/>
+
+Il dataSource usa il nome JNDI per recuperare l'isetanza del database.
+Il file orm.xml specifica i valori di default per un Persistence unit e informazioni su O/R Mapping
+Es.
+	<?xml version="1.0" encoding="UTF-8"?>
+	<entity-mappings version="1.0" xmlns=http://java.sun.com/xml/ns/persistence/orm xmlns:xsi=http://www.w3.org/2001/XMLSchema-instance xsi:schemaLocation="http://java.sun.com/xml/ns/persistence/orm orm_1_0.xsd">
+		<persistence-unit-metadata>
+			<persistence-unit-defaults>							//Definizione PU di default
+				<schema>ACTIONBAZAAR</schema>
+				<access>PROPERTY</access>
+				<entity-listeners>								//Specifica gli entity listener di default	
+					<entity-listener class = "actionbazaar.persistence.DefaultListener">
+					...
+					</entity-listener>
+				</entity-listeners>
+			</persistence-unit-defaults>
+		</persistence-unit-metadata>
+		<package>actionbazaar.persistence</package>
+		<access>PROPERTY</access>
+		<named-query name = "findAllCategories">
+			<query>SELECT c FROM Category AS c</query>
+			<hint name = "refresh" value = "true"/>
+		</named-query>
+		<entity name = "Category" class = "Category" metadata-complete = "false">			//Specifica il mapping con le entity
+			<table name = "CATEGORIES" />
+			<sequence-generator name = "CATEGORY_SEQ_GEN"
+				sequence-name = "CATEGORY_SEQ"
+				allocation-size = "1"
+				initial-value = "1"/>
+			<exclude-default-listeners/>
+			<exclude-superclass-listeners/>
+			<attributes>
+				<id name = "categoryId">
+					<column name = "CATEGORY_ID"/>
+					<generated-value strategy = "SEQUENCE" generator = "CATEGORY_SEQ_GEN"/>
+				</id>
+				<basic name = "categoryName">
+					<column name = "CATEGORY_NAME"/>
+				</basic>
+				<basic name = "createDate">
+					<column name = "CREATE_DATE"/>
+				</basic>
+				<many-to-many name = "items" target-entity = "Item">
+					<cascade>
+						<cascade-all/>
+					</cascade>
+					<join-table name = "CATEGORY_ITEMS">
+						<join-column name = "CATEGORY_ID" referenced-column-name = "CATEGORY_ID"/>
+						<inverse-join-column name = "ITEM_ID" referenced-column-name = "ITEM_ID"/>
+					</join-table>
+				</many-to-many>
+			</attributes>
+		</entity>
+	</entity-mappings>
+
+
+---------------- CAPITOLO 12 ----------------
+DAO: Data Accesso Object
+EAO: Entity Access Object. Oltre ad avere tutti i campi istanzia un entity manager che esegue il fill dell'entità ed esegue le funzioni.
+Es.
+	public interface BidEAO {
+		public Bid addBid(Item item, String bidderId, double bidPrice);
+		public Bid cancelBid(Long bidId);
+		...
+	}
+	-----
+	public class BidEAOImpl implements BidEAO {
+		private static String EM_NAME = "java:comp/env/actionBazaar";
+		public BidEAOImpl() {
+		}
+		
+		private EntityManager getEntityManager() {		//Look up container-managed EntityManager
+			try {
+				Context ctx = new InitialContext();
+				return (EntityManager)ctx.lookup(EM_NAME);
+			} catch (Exception e) {
+				e.printStackTrace();
+				return null;
+			}
+		}
+		public Bid addBid(Item item, String bidderId, double bidPrice) throws BidException {
+			EntityManager em = getEntityManager();	
+			if (em != null) {
+				Bid bid = new Bid();
+				...
+				em.persist(bid);
+				return bid;
+			}
+			...
+		}
+		public Bid cancelBid(Long bidId) {
+		...
+		}
+	}
+
+Es.
+	@PersistenceContext(unitName = "actionBazaar", name = "actionBazaar")		//dichiare la dipendenza sul persistence unit
+	@Stateless
+	public class PlaceBidBean implements PlaceBid {
+		public Long addBid(String userId, Long itemId, double bidPrice) throws BidException {
+			...
+			BidEAO bidEAO = EAOFactory.jpa.getBidEAO();							//Crea una istanza di EAO
+			Bid bid = bidEAO.addBid(item, userId, bidPrice);					//Usa l'EAO per aggiungere un nuovo Bid
+			return bid.getBidId();
+		}
+	}
+	---
+	public abstract class EAOFactory {
+		public static final EAOFactory jpa = new JPAEAOFactory();
+		public abstract ItemEAO getItemEAO();
+		public abstract BidEAO getBidEAO();
+		...
+	}
+	public class JPAEAOFactory extends EAOFactory {
+		public JPAEAOFactory(){}
+		public BidEAO getBidEAO() {
+		return (new BidEAOImpl());
+	}
+
+Tramite questo pattern se si volesse modificare il livello di persistenza bisognerebbe modificare solo le implementazioni degli EAO
+
+/*/*/*/*/ Continua da pagina 435
 
 
 
- 
- 
+
+
+
+
+
+
+
+
+
+
+
+
