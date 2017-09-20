@@ -1464,15 +1464,303 @@ Es.
 
 Tramite questo pattern se si volesse modificare il livello di persistenza bisognerebbe modificare solo le implementazioni degli EAO
 
-/*/*/*/*/ Continua da pagina 435
+SEssion facade pattern(stateful o stateles)
+Utile a limitare per ridurre il numero delle chiamate remote.
+Client->SessionfacadeBean->EAO->perstistence
+Punti di forza del session facade:
+- Centralizza la logica di business in un unico punto
+- Il client non conosce la struttura del sistema
+- Aiuta nella gestione delle transazioni e della sicurezza centralizzandola in un unico punto.
+- semplifica la scrittura del codice del client
+Es. SessionFacade been
+	@PersistenceContext(unitName = "actionBazaar", name = "actionBazaar")
+	@Stateless(name = "PlaceBid")
+	public class PlaceBidBean implements PlaceBid {
+		public PlaceBidBean() {
+		}
+		public Long addBid(String userId, Long itemId, Double bidPrice) throws BidException {
+			...
+			Item item = itemEAO.findByItemId(itemId);
+			Bid highBid = itemEAO.findHighestBidForItem(item);
+			if (bidPrice <= highBid.getBidPrice()) {
+				throw new BidException("Bid Price is lower than the current bid price");
+			}
+			...
+			return bidEAO.addBid(item, userId, bidPrice);
+		}
+	}
+Es. Client
+	@EJB
+	private PlaceBid placeBid;
+	...
+	Bid bid = placeBid.addBid(itemId, userId, bidPrice);
+
+Si può avere ottenere una referenza ad un EJB tramite injection in due modi:
+- @EJB annotazione
+- utilizzando ejb-ref e ejb-loacl-ref nel deployment descriptor web.xml
+Es.
+	public class ActionBazaarBidControllerServlet extends HttpServlet {
+		@EJB private PlaceBid placebid;
+		...
+		placeBid.addBid(bidderId, itemId, bidPrice);
+		...
+	}
+Es. 
+	<ejb-ref>
+		<ejb-ref-name>PlaceBid</ejb-ref-name>
+		<ejb-ref-type>Session</ejb-ref-type>
+		<remote>actionbazaar.buslogic.PlaceBid</remote>						//EJB remoto
+		<injection-target>
+			<injection-target-name>placeBid</injection-target-name>			//nome bean inject
+			<injection-target-class>
+				actionbazaar.web.ActionBazaarBidControllerServlet			//Classe dove fare l'inject
+			</injection-target-class>
+		</injection-target>
+	</ejb-ref>
+
+Se si vuole utilizzare uno stateful session bean in una web applicazion, allora si ha bisogno di eseguire una lookup JNDI e memorizzare l'istanza dell'EJB restituita nell'HTTPSession Object.
+In questo modo lo stesso utente utilizza la stessa istanza del bean nelle attività future.
+In moduli libreria non gestiti dall'entity manager non si può usare la Dependency Injection(Es. @EJB) ma bisogna utilizzare la lookup.
+
+Service Locator Design pattern: utile per centralizzare il codice JNDI
+
+Per utilizzare JPA nel livello web bisogna inserire nella directory WEB-INF/classes del WAR tutte le entity e il file persistence.xml nella directory WEB-INF/classes/META-INF/.
+In alternativa si possono inpacchettare in un JAR e mettere quest'ultimo sotto WEB-INF/lib. I file perstistence.xml e orm.xml(opzionale) vanno nella cartella META-INF del Jar.
+Es. WAR
+	html/
+	jsp/
+	WEB-INF/web.xml
+	WEB-INF/classes
+		actionbazaar/persistence/Bid.class
+		...
+		acionbazaar/web/ActionBazaarActionController.class
+		META-INF/persistence.xml				//Required
+		META-INF/orm.xml						//Optional
+	WEB-INF/lib/entities.jar
+
+Ci sono tre scenari possibili nell'utilizzare le JPA nei web container:(12.3.*)************************************************Rivedi
+- utilizzando un container-managed entity manager in un Java EE 5 container
+- utilizzando un application-managed entity manager con un JTA transaction manager in un Java EE 5 container
+- utilizzando un application-managed entity manager con transazioni locali fuori dal container.
+
+---------------- CAPITOLO 13 ----------------
+Pessimistic Locking: vengono loccate tutte le righe intaccate da un utente
+Optimistic Locking: viene copiata l'istanza del database da modificare, modificata e al momento del salvataggio se quella istanza è stata modificata(attributo version) allora viene sollevata una eccezione. Il lock sarà applicato solo durante l'operazione di scrittura
+Es.
+	@Entity
+	@Table(name = "ITEMS")
+	public class Item implements Serializable {
+		@Id
+		@Column(name = "ITEM_ID")
+		protected Long itemId;
+		...
+		@Version				//specifica che è la colonna designata al versionamento
+		@Column(name = "OPT_LOCK")
+		private Long version;
+		...
+	}
+
+Es. settare un lock sull'entity manager
+	// begin transaction...
+	entityManager.lock(item, LockModeType.READ);
+	...
+	System.out.println(item.getInitialPrice());
+Es.
+	Item item = em.find(Item.class, itemId);
+	em.lock(item, LockModeType.WRITE);
+	item.addBid(bid);
+	bid.setItem(item);
+
+Aumentare le prestazioni del livello di persistenza che generalmente è quello ne genera di èiù:
+- evitare di utilizzare le uno a uno se è possibile utilizzare l'@Embeddedable o fondere direttamente le due tabelle in un unica(a meno che non ci sianotanti dati)
+- se ci sono campi di grandi dimensioni(img o video) è opportuno dividere la tabella in più tabelle creando una relazione One-to-one con fetch type lazy.
+- Utilizzare l'ereditarietà con la colonna che funge da discriminante(capitolo 8)
+- impostare bene il connection pool
+- cachare le query SQL in modo che il persistence provider non debba ogni volta parserizzare le query JPQL(utilizzare i parametri ?1 e non concatenare le stringhe altrimenti il sistema non cacha)
+- usare named queryes piuttosto che query dinamiche laddove possibile
+- usare le transazioni solo se è necessario (cambiare dal default REQUIRED a NOT_SUPPORTED per le query in sola lettura)
+- disabilitare il caricamento EAGER laddove non serve
+	ES.
+		SELECT u
+		FROM User u JOIN FETCH u.billingInfo 		//Fetch indica che lo deve fare in maniera eager
+		WHERE u.firstName like ?1
+
+- non abusare del metodo flush() dell'entity manager per evitare di fare tanti accessi al db
+- evitare il pessimistic looking
+- Se serve l'utilizzo del DELETE_CASCADE, impostarlodirettamente come constraint sulla tabella del database e non come parametro del livello di persistenza poichè è più veloce
+- non esagerare con il cascade
+- per grandi update conviene direttamente eseguire il tutto in JPQL e non scaricare la lista di elementi da modificare e fare l'update uno per uno.
+- utilizzare l'ordinamento solo qnd serve e con la clausola @OrderBy
+- impostare il fetch size corretto
+
+Chachare le risorse per aumentare le prestazioni:
+- transactional cache:
+	assicura che uno stesso oggetto viene recuperato dalla cache quando viene chiamato nuovamente.
+	Quando utilizzi em.find() il persistence context restituisce l'elemento dalla transactional cache e non fa nuovamente la chiamata al db.
+
+- extended persistence context:
+	gli stateful session bean permettono di usare questa tecnologia per ridurre gli accessi al db.
+	Recupera le entity e le mette in memoria del session bean cosi come per l'entity manager.(es pag 480)
+	Utile per singolo client
+	
+- persistence unit cache level
+	Si possono cachare gli elementi anche per più di un utente, a livello di cache di persistence unit
+	Creare delle read only entities
+
+Aumentare le performance dei session bean:
+- Usare le interfacce remote solo se nece4sszario
+- Usare gli stateful session bena soloi se necessario
+- usare il session facade design pattern per evitare tante DI di EJB
+- Disabilitare le transazioni(quindi anche i lock)(di default required) per tutti i metodi che non ne hanno bisogno(ad es le find...)
+- ottimizzare lo stateless bean pool
+- gestire in maniera che non sia dispendioso la passivizzazione e riattivazione degli stateful
+- utilizzare il @Remove per gli stateful
+- impostare i campi che non serve inviare nele classi serializzabili come campi transient
+
+Aumentare le performance di MDB:
+- inizializzazione e termine delle risorse come connesione al db, socket e files tramite @PostContruct e @PreDestroy
+- Come per gli stateless le istanze di MDB vengono pollate e quindi bisogna definire una giusta dimensione
+
+Clusterizzazione delle applicazioni EJB:
+- Load balancing: quando più applicazion server lavorano in gruppo per bilanciare le richieste tra tutti i server.
+	quando aumentano i client basta aggiungere altri server. Utile quasndo l'applicazione è stateless.
+- Failover: un utente si rivolge ad un unico server, nel caso di failure del server la richiesta viene spostata ad un altro server.
+	Utilizzata per gli stateful
+
+Da pag 498  a 496 alcune logiche di clusterizzazione.
 
 
+---------------- CAPITOLO 14 ----------------
+Migrazione da EJB 2  a EJB 3
 
 
+---------------- CAPITOLO 15 ----------------
+ESPORRE GLI EJB COME WEB SERVICES(538):
+WSDL(Web Service description Language): descrive il servizio che espone e come deve essere utilizzato, file XML. Comunicazione con il servizio tramite SOAP
+Registro UDDI(Universal description, Discovery and Integration) : si registrano i WSDL
+Interazione client server con wsdl:
+	- Ogni servizio esposto deve essere registrato nell'UDDI
+	- Successivamente il client fa una lookup sull'UDDI per ricercare il servizio
+	- L'UDDI restituisce al client il WSDL
+	- Il client usa il WSDL per invocare i servizi SOAP
+REST: Representational State Transfer, non dipende dal SOAP ma XML o JASON su protocollo HTTP. Ogni vendor può supportarlo o meno(Jboss, Glassfish...)
 
+Architettura SOAP:
+- service messaging: messaggi client-service in XML e deve seguire una struttura ben definita
+- service description: ogni web service ha un corrispondente documento XML che lo descrive, i parametri che devono essere passati e i valori di ritorno e cosi via.
+	Il client consuma il File WSDL ino modo da comunicare con il web service.
+- service transport: HTTP protocol
 
+SOAP è un protocollo distribuito di comunicazione come Java RMI, messaggi in XML.
+Costituzione: header= opzionale, envelope e body= obbligatori. 
+Es.  
+	<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+		<SOAP-ENV:Header/>
+		<SOAP-ENV:Body>
+			<addBid xmlns="http://actionbazaar.com/Bidding">
+				<user-id>viper</user-id>
+				<item-id>100</user-id>
+				<bid-price>2000.24</bid-price>
+			</addBid>
+		</SOAP-ENV:Body>
+	</SOAP-ENV:Envelope>
 
+JAXB(Java Architecture for XML binding): permette ai web service di usare lo schema XML
 
+il registro UDDI è platform indipendent è basato su XML e permette ai client di ricercare i web services.
+Una volta che il client ha trovato il service che gli interessa richiede il relativo WSDL.
+Il client utilizza il WSDL per collegarsi al servizio, invocarlo
+
+JAX-WS: Java Api for XML-Based Web Services: utile a semplificare lo sviluppo di applicazioni web service
+	Espone sia classi Java che Stateless EJBs(a differenza delle prime hanno delle annotazioni in più)
+	Differenza tra Java Web Service e EJB 3 Web Service è che questiultimi permettono di gestire la sicurezza e le transazioni in maniera dichiarativa.
+Come sviluppare un EJB web service con Jax-Ws 2.0
+	- Cenerare il WSDL che descrive il servizio
+	- Costruire l'interfaccia endpoint di servizio(SEI)
+	- identificare l'interfaccia di endopoint nel file ejb-jar.xml
+	- inpacchetttare tutto questo con webservices.xml
+Es. EJB come webservices
+		@WebService(targetNamespace = "urn:ActionBazaarPlaceBidService")			//Esposto come web service
+		@SOAPBinding(style = SOAPBinding.Style.DOCUMENT)							//Definito lo stile di binding
+		@Stateless(name = "PlaceBid")
+		public class PlaceBidBean implements PlaceBid {
+			@PersistenceContext private EntityManager em;
+			public PlaceBidBean() {
+			}
+			@WebMethod																//Esposto metodo nel web service			
+			@WebResult(name = "bidNumber")											//customizzato il nome per il parametro di ritorno
+			public Long addBid( @WebParam(name = "User") String userId, @WebParam(name = "Item") Long itemId, @WebParam(name = "Price") Double bidPrice) { //Customizzati i nomi dei parametri  passati
+			return persistBid(userId, itemId, bidPrice);
+			}
+			private Long persistBid(String userId, Long itemId, Double bidPrice)
+			{
+			}
+		}
+
+L'annotazione @WebService può essere utilizzata anche sull'interfaccia della classe.
+Es. mettere un riferimento ad un wsdl già generato(approccio meet-in-the-middle)
+	@WebService(wsdlLocation = "META-INF/myPlaceBidService.wsdl")
+	public interface PlaceBidWS {
+		public Long addBid(String bidderId, Long itemId, Double bidPrice);
+	}
+Il server in maniera automatica genera una service endopoint interface(SEI) quando viene utilizzata l'annotazione @WebService.
+In base al vendor questa interfaccia viene specificato il nome, ma è possibile anche inserirne uno personalizzato tramite il parametro endpointInterface.
+Es.
+	@WebService(endPointInterface = "actionbazaar.buslogic.PlaceBidSEI")
+	@Stateless(name = "PlaceBid")
+	public class PlaceBidBean implements placeBid{}	
+	
+Es. Java client che accede ad un web service
+	import javax.xml.ws.WebServiceRef ;
+	import actionbazaarplacebidservice.PlaceBidService;											//Generazione dell'interfaccia del web service
+		...
+		@WebServiceRef(wsdlLocation="http://localhost:8080/PlaceBidService/PlaceBidBean?WSDL")	//Inietta una referenza al web service
+		public static void main(String [] args) {
+		private static PlaceBidService placeBidService;														
+			try {
+				actionbazaarplacebidservice.PlaceBidBean placeBid =	placeBidService.getPlaceBidBeanPort();	//Ottiene un proxy al web service
+				System.out.println("Bid Successful, BidId Received is:" + placeBid.addBid("dpanda", Long.valueOf(9001), 2000005.50 ));	//Invoca il metodo
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
+		}
+	}
+	
+I vendor offrono delle utility per generare degli artefatti client-side per accedere al web service.
+Lo strumento legge il documento WSDL e genera l'interfaccia di endpoint e le classi proxy che possono essere utilizzate per invocare i metodi sul web service come su un oggetto locale.
+ES. Glassfish offre wscompile o wsimport, esempio di configurazione del build.xml
+	<target name="gen-proxy" depends="setup">
+		<exec executable="${J2EE_HOME}/bin/${wsimport}" failonerror="true">
+			<arg line="-keep -d ${cli.proxy.dir} http://${admin.host}: ${http.port}/PlaceBidService/PlaceBidBean?WSDL"/>
+		</exec>
+	</target>
+	
+---------------- CAPITOLO 16 ----------------	
+Spring + EJB	
+---------------- APPENDICE A ----------------
+RMI E JNDI
+---------------- APPENDICE B ----------------
+DATABAES RELAZIONALI
+---------------- APPENDICE C ----------------	
+ANNOTAZIONI
+---------------- APPENDICE D ----------------	
+DEPLOYMENT DESCRIPTOR
+---------------- APPENDICE D ----------------	
+INSTALLAZIONE E CONFIGURAZIONE DI Java EE 5 SDK	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 
 
 
