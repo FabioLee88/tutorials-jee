@@ -1,0 +1,22 @@
+IT Operation(sistemista e trattare con il cliente) + Developer = DevOps
+
+DOCKER:
+Macchina virtuale molto leggera senza sistema operativo
+
+Docker container:
+unita isolata in cui l'applicazione è inpacchettata inseieme alle librerie e a codice binario
+
+Dockerfile:
+è un file che contiene la configurazione di una applicazione e delle risorse di cui necessita. 
+Permette di virtualizzare (dockerizzare).
+
+Docker Image: 
+è creata via dockerfile tramite l'image builder e si tratta di una snapshot dell'applicazione
+
+Docker engine:
+è un container a runtime. Legge le immagini docker e avvia i container
+
+Docker registry:
+è il servizio remoto dove le docker images vengono registrate per poterle poi deployare verso altri sistemi o condividere.
+E' un hub
+

@@ -1,0 +1,106 @@
+Utile a deployare
+si utilizza il file di configurazione build.xml
+
+
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="PrimoTest" default="info3">
+	
+	<target name="test">
+		<echo>This is a test label!</echo>
+	</target>
+
+	<target name="info">
+		<echo>Hello World - Welcome to Apache Ant!</echo>
+	</target>
+
+	<target name="info2" depends="info">
+		<echo>This is a first tutorial!</echo>
+	</target>
+
+	<property name="sitename" value="www.google.com" />
+
+	<target name="info3" depends="info2">
+		<echo>Apache Ant version is ${ant.version} - You are at ${sitename}
+		</echo>
+	</target>
+
+</project>
+
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project default="run" name="Secondo test ant file">
+	<target name="run" depends="compile">
+		<java classname="it.example.ant.HelloWorld">
+			<classpath path="staging"/>
+		</java>
+	</target>
+	<target name="compile">
+		<javac includeantruntime="true" srcdir="./src" destdir="staging" /> <!-- includeantruntime="true" solo al primo ciclo per fare la build -->
+	</target>
+</project>
+
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="terzo test" default="compile" basedir=".">
+	<target name="delete">
+		<delete dir="bin" />
+		<delete dir="src" />
+		<delete dir="lib" />
+		<delete dir="test-output"></delete>
+	</target>
+
+	<path>
+		<!-- <pathelement location="lib/XXX.jar" />
+		<pathelement location="lib/YYY.jar" />
+		<pathelement location="lib/ZZZ.jar" /> -->
+		<pathelement location="bin" />
+	</path>
+
+	<target name="create" depends="delete">
+		<mkdir dir="bin" />
+		<mkdir dir="src" />
+		<mkdir dir="lib" />
+		<mkdir dir="test-output" />
+	</target>
+
+	<target name="copy" depends="create">
+		<copydir
+			dest="C:\Users\fabio.abbinante\workspaces\ant\TerzoTest\ant\build\src"
+			src="C:\Users\fabio.abbinante\workspaces\ant\TerzoTest\src" excludes="**/lib/**" /><!-- 
+			esclude i file sotto la folder lib / regular expression -->
+		<copy
+			todir="C:\Users\fabio.abbinante\workspaces\ant\TerzoTest\ant\build\lib"
+			overwrite="true">
+			<fileset
+				dir="C:\Users\fabio.abbinante\workspaces\ant\TerzoTest\src\it\example\lib"
+				includes="**/*.java"></fileset> <!-- includes="**/*.java" di solito si importano i jar -->
+		</copy>
+	</target>
+
+	<target name="compile" depends="copy">
+		<javac 
+			classpathref="classpath"
+			includeantruntime="true"
+			srcdir="C:\Users\fabio.abbinante\workspaces\ant\TerzoTest\ant\build\src"
+			destdir="C:\Users\fabio.abbinante\workspaces\ant\TerzoTest\ant\build\bin"
+			includes="**/*.java"></javac> <!-- classpathref="classpath" utilizzato per importare le librerie .jar salvate nel path -->
+	</target>
+</project>
+
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-
+-*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*--*-*-*-*-*-

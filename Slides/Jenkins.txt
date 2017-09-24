@@ -1,0 +1,154 @@
+JENKINS è utile per continuos delivery
+
+Jenkins Pipeline(o pipeline):
+E' una siute di plugins che supporta implementing e integratinf continous in delivery pipeline in Jenkins
+
+Continous delivery pipeline: è una espressione automatizzata di un processo per prendere software dal version control giusto per i tuoi utenti e customer.
+
+il file Jenkinsfile contiene la configurazione della pipeline
+Es.
+	pipeline {
+		agent { docker 'maven:3.3.3' }			//php, ruby,node,...
+		stages {
+			stage('build') {
+				steps {
+					sh 'mvn --version'			//comando va nel tag sh, ce ne possono anche essere più di uno
+				}
+			}
+		}
+	}
+Es.
+	pipeline {
+		agent any
+		stages {
+			stage('Test') {
+				steps {
+					sh 'echo "Fail!"; exit 1'
+				}
+			}
+		}
+		post {
+			always {
+				echo 'This will always run'
+			}
+			success {
+				echo 'This will run only if successful'
+			}
+			failure {
+				echo 'This will run only if failed'
+			}
+			unstable {
+				echo 'This will run only if the run was marked as unstable'
+			}
+			changed {
+				echo 'This will run only if the state of the Pipeline has changed'
+				echo 'For example, if the Pipeline was previously failing but is now successful'
+			}
+		}
+	}
+
+Es. Su windows per eseguire comandi bat
+	pipeline {
+		agent any
+		stages {
+			stage('Build') {
+				steps {
+					bat 'set'
+				}
+			}
+		}
+	}
+Es.
+	pipeline {
+		agent any
+		stages {
+			stage('Deploy') {
+				steps {
+					retry(3) {			//ripete tre volte lo script flakey-deploy.sh
+						sh './flakey-deploy.sh'
+					}
+
+					timeout(time: 3, unit: 'MINUTES') {	//aspetta tre minuti prima di eseguire lo script health-check.sh
+						sh './health-check.sh'
+					}
+				}
+			}
+		}
+	}
+	
+Es. variabili globali(non inserire password o info inportanti poichè è un file pubblico)
+	pipeline {
+		agent any
+
+		environment {
+			DISABLE_AUTH = 'true'
+			DB_ENGINE    = 'sqlite'
+		}
+
+		stages {
+			stage('Build') {
+				steps {
+					sh 'printenv'
+				}
+			}
+		}
+	}
+Es. variabili globali recuperate direttamente dall'ambiente
+	environment {
+		AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+		AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+	}
+	
+Es. lanciare un rubber che esegue tutti i test junit
+	pipeline {
+		agent any
+		stages {
+			stage('Test') {
+				steps {
+					sh './gradlew check'
+				}
+			}
+		}
+		post {
+			always {
+				archive 'build/libs/**/*.jar'
+				junit 'build/reports/**/*.xml'
+			}
+		}
+	}
+	
+Es. send email
+	post {
+		failure {
+			mail to: 'team@example.com',
+				 subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
+				 body: "Something is wrong with ${env.BUILD_URL}"
+		}
+	}
+	
+Es. richiedere interazione umana(input)
+	pipeline {
+		agent any
+		stages {
+			/* "Build" and "Test" stages omitted */
+
+			stage('Deploy - Staging') {
+				steps {
+					sh './deploy staging'
+					sh './run-smoke-tests'
+				}
+			}
+
+			stage('Sanity check') {
+				steps {
+					input "Does the staging environment look ok?"
+				}
+			}
+
+			stage('Deploy - Production') {
+				steps {
+					sh './deploy production'
+				}
+			}
+		}
+	}
