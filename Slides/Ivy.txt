@@ -1,0 +1,95 @@
+Come utilizzare Ivy:
+https://www.youtube.com/watch?v=DtkgAAT91E0
+1. Su eclipse è possibile scaricare i 2 plugin ivy e ivyDE dal marcketplace tramite http://www.apache.org/dist/ant/ivyde/updatesite/
+2. Creare un nuovo file nella root del progetto(allo stesso livello di build.xml) chiamato ivy.xml	
+	Es. contenuto del file ivy.xml utile a scaricare la libreria GSON
+		<?xml version="1.0" encoding="ISO-8859-1"?>
+		<ivy-module version="2.0">
+			<info organization="it.example.ivy" module="my-module" revision="1.0"/>
+			<dependencies>
+				<dependency org="com.google.code.gson" name="gson" rev="2.3.1" />
+			</dependencies>
+		</ivy-module>
+3. Tx destro sul progetto->properties->javabuild path-> add library-> ivyDe Managed Dependencyes e finish
+4. autopmaticamente scaricherà la dipendenza nella cartella della root ivy(ora è possibile utilizzare la libreria nel progetto)
+5. Modificare il build.xml per automatizzare gli import utilizzando ant
+	a. definire il namespace di ivy	
+		Es. <project name="Example" default="build" basedir="." xmlns:ivy="antlib:org.apache.ivy.ant">
+				<target name="resolve" description="retrive dependencies with ivy">
+					<ivy:retrieve pattern="Libraries/[artifact]-[revision]-[type].[ext]" />
+				</target>
+				<target name="build" depends="resolve">
+					...
+				</target>
+			</project>
+			
+
+Tutorial Ivy:		
+http://www.codetab.org/apache-ivy-tutorial
+			
+Tasks supportati da ivy:
+Resolve: Resolves the dependencies described in ivy.xml and places the resolved dependencies in ivy cache.
+Cachepath: Constructs an ant path consisting of artifacts in ivy cache which can be referred in other ant tasks through Ant path mechanism.
+Retrieve: Copies the resolved dependencies from cache to a specified directory
+Install: Installs a module to a specified repository. In this guide, Install task is used to install libraries from public repository to a local/shared repository
+Publish: Publish a module to a repository.
+
+
+Terminologia Ivy:
+Organisation: 
+	Name of company, individual or team which created the software. Example: org.apache etc.
+Module: 
+	A module is a self-contained, reusable unit of software. Module normally has a version. Example: commons-lang, log4j etc.
+Module Descriptor: 
+	XML file containing the description or metadata of a module. Usually this file is named as ivy.xml
+Artifact: 
+	Artifact is a single file ready for distribution. In Java it is normally a jar file. But it may be of any file type like zip, gz etc. Module contains one or more artifacts. Jar, Source jar and Javadoc jar are examples of artifact.
+Type: 
+	Type denotes the category of artifact. Example: jar, src, source, doc, bundle etc.
+Artifact file name Extension: 
+	Extension of an artifact. Example: jar, zip, tar, tar.gz etc
+Module Revision: 
+	unique revision number or version name of a particular release of the module.
+Status of Revision: 
+	indicates how stable a module revision is. Status of Revision has to be one of the following values.
+		- integration: continuous build, a nightly build etc.
+		- milestone: distributed but not yet finished fully.
+		- release: tested and completed.
+Repository:
+	Distribution site where ivy can find modules, descriptors and artifacts. Repository can be public, local or shared.
+Ivy Settings:
+	Apache Ivy comes with a set of default settings, which enables it to run without any configuration by the user. Default settings may be overridden through an XML settings file which is usually named as ivysettings.xml
+	
+	
+	
+Quando viene eseguito un resolve ant cerca il commons-lang 2.6 e inserisce l'artefatto nella cache.
+Per compilare le classi java, ant richiede un classpath che fa riferimento all'artefatto presente nella cache, il task Ivy Cachepath costruisce il classpath richiesto.
+Es. 	
+	<project name="ivy example" default="compile" xmlns:ivy="antlib:org.apache.ivy.ant">
+		 <target name="resolve" description="resolve dependencies with ivy">
+		  <ivy:resolve />
+		  <ivy:cachepath pathid="default.classpath" />
+		 </target>
+		 <target name="compile" depends="resolve" description="Compile">
+		  <mkdir dir="build/classes" />
+		  <javac srcdir="src" destdir="build/classes">
+		   <classpath refid="default.classpath" />
+		  </javac>
+		 </target>
+	</project>
+	
+It is important to note that, neither <ivy:cachepath> nor <ivy:resolve> copy the artifacts from cache to the project workspace. Artifacts continue to be in the cache. and <ivy:cachepath> simply constructs a classpath that points to artifacts in the cache.
+
+Task <ivy:retrieve> copies resolved dependencies to a specified location in the project workspace.(METODO MIGLIORE DEL CACHEPATH)
+Es. 	
+	<project name="ivy example" default="retrieve" xmlns:ivy="antlib:org.apache.ivy.ant">
+	 <target name="retrieve" description="Resolve and Retrieve with ivy">
+	  <ivy:resolve />
+	  <ivy:retrieve sync="true" type="jar" /> <!-- Aggiungere il campo pattern per mettere gli artefatti un una cartella diversa dalla lib di default: Es. pattern="myfolder/[artifact]-[revision].[ext]" -->
+	 </target>
+	</project>
+	
+Sync set to true will ensure that any extra files in the lib directory is deleted.
+Type set to jar tells ivy to copy only jar artifacts. Source and javadoc artifacts are ignored.
+
+Il file ivisettings.xml è utile per la configurazione di ivy
